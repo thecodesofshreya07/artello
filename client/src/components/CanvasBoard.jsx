@@ -15,6 +15,7 @@ export default function CanvasBoard() {
     // Brush settings
     const [brushSize, setBrushSize] = useState(4);
     const [selectedColor, setSelectedColor] = useState("#000000");
+    const [roomId, setRoomId] = useState("");
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -44,6 +45,55 @@ export default function CanvasBoard() {
         return () => {
             socket.off("draw", handleRemoteDraw);
         };
+    }, []);
+
+    useEffect(() => {
+        socket.on("init-canvas", (history) => {
+            if (!contextRef.current) return;
+            const ctx = contextRef.current;
+            history.forEach((drawData) => {
+                ctx.strokeStyle = drawData.color;
+                ctx.lineWidth = drawData.brushSize;
+                ctx.beginPath();
+                ctx.moveTo(drawData.x1, drawData.y1);
+                ctx.lineTo(drawData.x2, drawData.y2);
+                ctx.stroke();
+            });
+        });
+        return () => {
+            socket.off("init-canvas");
+        };
+    }, []);
+
+    useEffect(() => {
+        const handleClear = () => {
+            const canvas = canvasRef.current;
+            const ctx = contextRef.current;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        };
+        socket.on("clear", handleClear);
+        return () => {
+            socket.off("clear", handleClear);
+        };
+    }, []);
+
+    useEffect(() => {
+        socket.on("undo", (updatedHistory) => {
+            const canvas = canvasRef.current;
+            const ctx = contextRef.current;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            updatedHistory.forEach((drawData) => {
+                ctx.strokeStyle = drawData.color;
+                ctx.lineWidth = drawData.brushSize;
+                ctx.beginPath();
+                ctx.moveTo(drawData.x1, drawData.y1);
+                ctx.lineTo(drawData.x2, drawData.y2);
+                ctx.stroke();
+            });
+        });
+        return () => socket.off("undo");
     }, []);
 
     const startDrawing = (e) => {
@@ -76,6 +126,7 @@ export default function CanvasBoard() {
         ctx.lineTo(x, y);
         ctx.stroke();
         const drawData = {
+            roomId: roomId,
             x1: lastXRef.current,
             y1: lastYRef.current,
             x2: x,
@@ -91,12 +142,27 @@ export default function CanvasBoard() {
     const clearCanvas = () => {
         const canvas = canvasRef.current;
         const ctx = contextRef.current;
-
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        socket.emit("clear", roomId);
+    };
+
+    const joinRoom = () => {
+        if (!roomId) return;
+        socket.emit("join-room", roomId);
+        console.log("Joined room:", roomId);
     };
 
     return (
         <>
+            <input
+                type="text"
+                placeholder="Enter Room ID"
+                value={roomId}
+                onChange={(e) => setRoomId(e.target.value)}
+            />
+            <button onClick={joinRoom}>
+                Join Room
+            </button>
             <div style={{ marginBottom: "10px" }}>
                 <input
                     type="range"
@@ -123,7 +189,9 @@ export default function CanvasBoard() {
                     Clear
                 </button>
             </div>
-
+            <button onClick={() => socket.emit("undo", roomId)}>
+                Undo
+            </button>
             <canvas
                 ref={canvasRef}
                 width={800}
