@@ -1,9 +1,10 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import "./styles.css";
 import { drawShape, isPointInShape, drawSelectionHandles, getResizeHandle } from "../utils/canvasUtils";
-import { PenIcon, EraserIcon, ShapeIcon, SelectIcon, UndoIcon, RedoIcon, TrashIcon } from "./icons";
+import { PenIcon, EraserIcon, ShapeIcon, SelectIcon, UndoIcon, RedoIcon, TrashIcon, TextIcon } from "./icons";
 import SidebarBtn from "./SidebarBtn";
 import { socket } from "../services/socket";
+import { drawTextItem } from "../utils/textUtils";
 
 export default function CanvasBoard() {
   const canvasRef = useRef(null);
@@ -31,6 +32,10 @@ export default function CanvasBoard() {
   const [canvasColor, setCanvasColor] = useState("#ffffff");
   const [selectedShape, setSelectedShape] = useState("rectangle");
   const [statusMsg, setStatusMsg] = useState("");
+  const [texts, setTexts] = useState([]);
+  const [editingText, setEditingText] = useState(null);
+  const [textDraft, setTextDraft] = useState("");
+  const [textBox, setTextBox] = useState(null);
 
   useEffect(() => { shapesRef.current = shapes; }, [shapes]);
   useEffect(() => { selectedShapeIdRef.current = selectedShapeId; }, [selectedShapeId]);
@@ -61,10 +66,13 @@ export default function CanvasBoard() {
         ctx.stroke();
       });
     });
-
+    //console.log("ALL SHAPES", shapesRef.current);
     shapeList.forEach((shape) => {
       drawShape(ctx, shape);
       if (shape.id === selectedShapeIdRef.current) drawSelectionHandles(ctx, shape);
+    });
+    texts.forEach((textItem) => {
+      drawTextItem(ctx, textItem);
     });
 
     if (preview) {
@@ -73,8 +81,14 @@ export default function CanvasBoard() {
       drawShape(ctx, preview);
       ctx.restore();
     }
-  }, [canvasColor]);
+  }, [canvasColor, texts]);
 
+  useEffect(() => {
+    redrawCanvas(
+      strokesRef.current,
+      shapesRef.current
+    );
+  }, [texts, redrawCanvas]);
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
@@ -89,7 +103,7 @@ export default function CanvasBoard() {
     const ctx = contextRef.current;
     if (!ctx) return;
     redrawCanvas(strokesRef.current, shapesRef.current);
-  }, [canvasColor]);
+  }, [canvasColor, texts]);
 
   useEffect(() => {
     const handleRemoteDraw = (d) => {
@@ -134,7 +148,7 @@ export default function CanvasBoard() {
     };
     socket.on("clear", handleClear);
     return () => socket.off("clear", handleClear);
-  }, [canvasColor]);
+  }, [canvasColor, texts]);
 
   useEffect(() => {
     const handle = (data) => {
@@ -153,6 +167,7 @@ export default function CanvasBoard() {
 
   useEffect(() => {
     const handleShapeAdd = (shape) => {
+      console.log("SHAPE ADDED", shape);
       if (shapesRef.current.find((s) => s.id === shape.id)) return;
       const updated = [...shapesRef.current, shape];
       shapesRef.current = updated;
@@ -199,6 +214,23 @@ export default function CanvasBoard() {
 
   const startDrawing = (e) => {
     const { x, y } = getPos(e);
+    if (tool === "text") {
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
+
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      setTextBox({
+        x,
+        y,
+        width: 0,
+        height: 0,
+      });
+
+      isDrawingRef.current = true;
+      return;
+    }
 
     if (tool === "select") {
       const sel = shapesRef.current.find((s) => s.id === selectedShapeIdRef.current);
@@ -248,6 +280,21 @@ export default function CanvasBoard() {
 
   const draw = (e) => {
     const { x, y } = getPos(e);
+    if (tool === "text" && textBox && isDrawingRef.current) {
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
+
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      setTextBox(prev => ({
+        ...prev,
+        width: x - prev.x,
+        height: y - prev.y,
+      }));
+
+      return;
+    }
 
     if (dragRef.current) {
       const { shapeId, startX, startY, origX, origY, origW, origH, handle, mode } = dragRef.current;
@@ -325,6 +372,23 @@ export default function CanvasBoard() {
   };
 
   const stopDrawing = (e) => {
+    if (tool === "text" && textBox) {
+      const newText = {
+        id: Date.now().toString(),
+        x: textBox.x,
+        y: textBox.y,
+        width: textBox.width,
+        height: textBox.height,
+        text: "",
+        color: selectedColor,
+      };
+      setTexts(prev => [...prev, newText]);
+      setEditingText(newText);
+      setTextDraft("");
+      isDrawingRef.current = false;
+      return;
+    }
+
     if (dragRef.current) {
       const finalShape = shapesRef.current.find((s) => s.id === dragRef.current.shapeId);
       if (finalShape) socket.emit("shape-update", { roomId, shape: finalShape });
@@ -448,6 +512,12 @@ export default function CanvasBoard() {
           <SidebarBtn icon={<EraserIcon />} label="Eraser" active={tool === "eraser"} onClick={() => setTool("eraser")} />
           <SidebarBtn icon={<ShapeIcon />} label="Shapes" active={tool === "shape"} onClick={() => setTool("shape")} />
           <SidebarBtn icon={<SelectIcon />} label="Select & Move" active={tool === "select"} onClick={() => setTool("select")} />
+          <SidebarBtn
+            icon={<TextIcon />}
+            label="Text"
+            active={tool === "text"}
+            onClick={() => setTool("text")}
+          />
           <div style={{ width: 28, height: 1, background: "#27272A", margin: "6px 0" }} />
         </aside>
 
@@ -543,7 +613,7 @@ export default function CanvasBoard() {
             </button>
           </header>
 
-          <div className="wb-canvas-wrap">
+          <div className="wb-canvas-wrap" >
             <canvas
               ref={canvasRef}
               className="wb-canvas"
@@ -555,9 +625,45 @@ export default function CanvasBoard() {
               onMouseUp={stopDrawing}
               onMouseLeave={stopDrawing}
             />
+
+            {editingText && (
+              <textarea
+                autoFocus
+                value={textDraft}
+                onChange={(e) => setTextDraft(e.target.value)}
+                style={{
+                  position: "absolute",
+                  left: editingText.x + (canvasRef.current?.offsetLeft || 0),
+                  top: editingText.y + (canvasRef.current?.offsetTop || 0),
+                  width: Math.abs(editingText.width),
+                  height: Math.abs(editingText.height),
+                  resize: "none",
+                  border: "1px dashed #ff69b4",
+                  background: "transparent",
+                  outline: "none",
+                  fontSize: "20px",
+                }}
+                onBlur={() => {
+                  setTexts(prev =>
+                    prev.map(t =>
+                      t.id === editingText.id
+                        ? { ...t, text: textDraft }
+                        : t
+                    )
+                  );
+
+                  setEditingText(null);
+                  setTextDraft("");
+
+                  redrawCanvas(
+                    strokesRef.current,
+                    shapesRef.current
+                  );
+                }}
+              />
+            )}
           </div>
         </div>
-
         <div className={`wb-status${statusMsg ? " visible" : ""}`}>
           {statusMsg}
         </div>
