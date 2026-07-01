@@ -1,548 +1,9 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
+import "./styles.css";
+import { drawShape, isPointInShape, drawSelectionHandles, getResizeHandle } from "../utils/canvasUtils";
+import { PenIcon, EraserIcon, ShapeIcon, SelectIcon, UndoIcon, RedoIcon, TrashIcon } from "./icons";
+import SidebarBtn from "./SidebarBtn";
 import { socket } from "../services/socket";
-
-const COLORS = {
-  bg: "#F7F7F5",
-  sidebar: "#18181B",
-  sidebarHover: "#27272A",
-  accent: "#6C63FF",
-  accentLight: "#EEF0FF",
-  danger: "#E5484D",
-  border: "#E4E4E7",
-  text: "#18181B",
-  muted: "#71717A",
-  white: "#FFFFFF",
-  canvasBg: "#FFFFFF",
-  tooltipBg: "#18181B",
-};
-
-const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@600&display=swap');
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    font-family: 'Inter', sans-serif;
-    background: ${COLORS.bg};
-    overflow: hidden;
-  }
-
-  .wb-shell {
-    display: flex;
-    height: 100vh;
-    width: 100vw;
-    overflow: hidden;
-  }
-
-  .wb-sidebar {
-    width: 60px;
-    background: ${COLORS.sidebar};
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 16px 0;
-    gap: 4px;
-    flex-shrink: 0;
-    z-index: 10;
-  }
-
-  .wb-logo {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 18px;
-    color: ${COLORS.accent};
-    letter-spacing: -0.5px;
-    margin-bottom: 20px;
-    user-select: none;
-  }
-
-  .wb-tool-btn {
-    position: relative;
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    border: none;
-    background: transparent;
-    color: #A1A1AA;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.15s, color 0.15s;
-  }
-
-  .wb-tool-btn:hover {
-    background: ${COLORS.sidebarHover};
-    color: ${COLORS.white};
-  }
-
-  .wb-tool-btn.active {
-    background: ${COLORS.accent}22;
-    color: ${COLORS.accent};
-  }
-
-  .wb-tool-btn.active::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 3px;
-    height: 20px;
-    background: ${COLORS.accent};
-    border-radius: 0 3px 3px 0;
-  }
-
-  .wb-tooltip {
-    position: absolute;
-    left: 52px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: ${COLORS.tooltipBg};
-    color: ${COLORS.white};
-    font-size: 12px;
-    font-weight: 500;
-    padding: 5px 10px;
-    border-radius: 6px;
-    white-space: nowrap;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.1s;
-    z-index: 100;
-  }
-
-  .wb-tool-btn:hover .wb-tooltip {
-    opacity: 1;
-  }
-
-  .wb-divider {
-    width: 28px;
-    height: 1px;
-    background: #27272A;
-    margin: 6px 0;
-  }
-
-  .wb-main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .wb-topbar {
-    height: 52px;
-    background: ${COLORS.white};
-    border-bottom: 1px solid ${COLORS.border};
-    display: flex;
-    align-items: center;
-    padding: 0 16px;
-    gap: 10px;
-    flex-shrink: 0;
-  }
-
-  .wb-room-input {
-    height: 34px;
-    padding: 0 12px;
-    border: 1px solid ${COLORS.border};
-    border-radius: 8px;
-    font-family: 'Inter', sans-serif;
-    font-size: 13px;
-    color: ${COLORS.text};
-    background: ${COLORS.bg};
-    outline: none;
-    width: 160px;
-    transition: border-color 0.15s;
-  }
-
-  .wb-room-input:focus {
-    border-color: ${COLORS.accent};
-    background: ${COLORS.white};
-  }
-
-  .wb-room-input::placeholder {
-    color: ${COLORS.muted};
-  }
-
-  .wb-join-btn {
-    height: 34px;
-    padding: 0 14px;
-    background: ${COLORS.accent};
-    color: ${COLORS.white};
-    border: none;
-    border-radius: 8px;
-    font-family: 'Inter', sans-serif;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: opacity 0.15s;
-  }
-
-  .wb-join-btn:hover { opacity: 0.88; }
-
-  .wb-topbar-sep {
-    width: 1px;
-    height: 22px;
-    background: ${COLORS.border};
-    margin: 0 4px;
-  }
-
-  .wb-top-btn {
-    height: 34px;
-    padding: 0 12px;
-    background: transparent;
-    border: 1px solid ${COLORS.border};
-    border-radius: 8px;
-    font-family: 'Inter', sans-serif;
-    font-size: 13px;
-    color: ${COLORS.text};
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    transition: background 0.12s, border-color 0.12s;
-  }
-
-  .wb-top-btn:hover {
-    background: ${COLORS.bg};
-    border-color: #D4D4D8;
-  }
-
-  .wb-top-btn.danger {
-    color: ${COLORS.danger};
-    border-color: #FECDD3;
-  }
-
-  .wb-top-btn.danger:hover {
-    background: #FFF1F2;
-  }
-
-  .wb-shape-select {
-    height: 34px;
-    padding: 0 10px;
-    border: 1px solid ${COLORS.border};
-    border-radius: 8px;
-    font-family: 'Inter', sans-serif;
-    font-size: 13px;
-    color: ${COLORS.text};
-    background: ${COLORS.bg};
-    outline: none;
-    cursor: pointer;
-  }
-
-  .wb-color-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-left: auto;
-  }
-
-  .wb-color-label {
-    font-size: 12px;
-    color: ${COLORS.muted};
-    white-space: nowrap;
-  }
-
-  .wb-color-swatch {
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
-    border: 1px solid ${COLORS.border};
-    cursor: pointer;
-    overflow: hidden;
-    position: relative;
-    flex-shrink: 0;
-  }
-
-  .wb-color-swatch input[type="color"] {
-    position: absolute;
-    inset: -4px;
-    width: calc(100% + 8px);
-    height: calc(100% + 8px);
-    border: none;
-    cursor: pointer;
-    opacity: 0;
-  }
-
-  .wb-color-preview {
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-  }
-
-  .wb-size-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .wb-size-label {
-    font-size: 12px;
-    color: ${COLORS.muted};
-    width: 42px;
-  }
-
-  .wb-slider {
-    -webkit-appearance: none;
-    width: 80px;
-    height: 4px;
-    border-radius: 4px;
-    background: ${COLORS.border};
-    outline: none;
-    cursor: pointer;
-  }
-
-  .wb-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: ${COLORS.accent};
-    cursor: pointer;
-    border: 2px solid ${COLORS.white};
-    box-shadow: 0 1px 4px rgba(0,0,0,0.18);
-  }
-
-  .wb-canvas-wrap {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: ${COLORS.bg};
-    background-image: radial-gradient(circle, #D4D4D8 1px, transparent 1px);
-    background-size: 24px 24px;
-    overflow: hidden;
-    padding: 20px;
-  }
-
-  .wb-canvas {
-    border-radius: 6px;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06);
-    display: block;
-    max-width: 100%;
-    max-height: 100%;
-  }
-
-  .wb-status {
-    position: fixed;
-    bottom: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: ${COLORS.tooltipBg};
-    color: ${COLORS.white};
-    font-size: 12px;
-    padding: 7px 14px;
-    border-radius: 20px;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.2s;
-    z-index: 50;
-  }
-
-  .wb-status.visible {
-    opacity: 1;
-  }
-
-  .wb-joined-badge {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    color: #16A34A;
-    font-weight: 500;
-    background: #F0FDF4;
-    border: 1px solid #BBF7D0;
-    border-radius: 20px;
-    padding: 4px 10px;
-  }
-
-  .wb-joined-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: #16A34A;
-  }
-`;
-
-function drawShape(ctx, shape) {
-  const { type, x, y, width, height, color, brushSize, fill } = shape;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = brushSize;
-  ctx.fillStyle = fill || "transparent";
-
-  const x0 = width >= 0 ? x : x + width;
-  const y0 = height >= 0 ? y : y + height;
-  const w = Math.abs(width);
-  const h = Math.abs(height);
-  const cx = x0 + w / 2;
-  const cy = y0 + h / 2;
-
-  ctx.beginPath();
-
-  switch (type) {
-    case "line":
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + width, y + height);
-      break;
-    case "rectangle":
-      ctx.rect(x0, y0, w, h);
-      break;
-    case "circle":
-      ctx.ellipse(cx, cy, w / 2, h / 2, 0, 0, 2 * Math.PI);
-      break;
-    case "triangle":
-      ctx.moveTo(cx, y0);
-      ctx.lineTo(x0, y0 + h);
-      ctx.lineTo(x0 + w, y0 + h);
-      ctx.closePath();
-      break;
-    case "diamond":
-      ctx.moveTo(cx, y0);
-      ctx.lineTo(x0 + w, cy);
-      ctx.lineTo(cx, y0 + h);
-      ctx.lineTo(x0, cy);
-      ctx.closePath();
-      break;
-    case "hexagon": {
-      const r = Math.min(w, h) / 2;
-      for (let i = 0; i < 6; i++) {
-        const angle = (Math.PI / 3) * i - Math.PI / 6;
-        const px = cx + r * Math.cos(angle);
-        const py = cy + r * Math.sin(angle);
-        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
-      }
-      ctx.closePath();
-      break;
-    }
-    case "star": {
-      const outerR = Math.min(w, h) / 2;
-      const innerR = outerR * 0.4;
-      for (let i = 0; i < 10; i++) {
-        const angle = (Math.PI / 5) * i - Math.PI / 2;
-        const r2 = i % 2 === 0 ? outerR : innerR;
-        const px = cx + r2 * Math.cos(angle);
-        const py = cy + r2 * Math.sin(angle);
-        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
-      }
-      ctx.closePath();
-      break;
-    }
-    case "arrow": {
-      const headLen = Math.min(w, h) * 0.35;
-      const ex = x + width;
-      const ey = y + height;
-      const angle = Math.atan2(height, width);
-      ctx.moveTo(x, y);
-      ctx.lineTo(ex, ey);
-      ctx.lineTo(ex - headLen * Math.cos(angle - Math.PI / 6), ey - headLen * Math.sin(angle - Math.PI / 6));
-      ctx.moveTo(ex, ey);
-      ctx.lineTo(ex - headLen * Math.cos(angle + Math.PI / 6), ey - headLen * Math.sin(angle + Math.PI / 6));
-      break;
-    }
-    default:
-      break;
-  }
-
-  if (fill && fill !== "transparent") ctx.fill();
-  ctx.stroke();
-}
-
-function isPointInShape(px, py, shape) {
-  const x0 = shape.width >= 0 ? shape.x : shape.x + shape.width;
-  const y0 = shape.height >= 0 ? shape.y : shape.y + shape.height;
-  const w = Math.abs(shape.width);
-  const h = Math.abs(shape.height);
-  const pad = 8;
-  return px >= x0 - pad && px <= x0 + w + pad && py >= y0 - pad && py <= y0 + h + pad;
-}
-
-function drawSelectionHandles(ctx, shape) {
-  const x0 = shape.width >= 0 ? shape.x : shape.x + shape.width;
-  const y0 = shape.height >= 0 ? shape.y : shape.y + shape.height;
-  const w = Math.abs(shape.width);
-  const h = Math.abs(shape.height);
-  const pad = 6;
-
-  ctx.save();
-  ctx.strokeStyle = COLORS.accent;
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([5, 3]);
-  ctx.strokeRect(x0 - pad, y0 - pad, w + pad * 2, h + pad * 2);
-  ctx.setLineDash([]);
-
-  [[x0 - pad, y0 - pad], [x0 + w + pad, y0 - pad], [x0 - pad, y0 + h + pad], [x0 + w + pad, y0 + h + pad]].forEach(([hx, hy]) => {
-    ctx.beginPath();
-    ctx.arc(hx, hy, 5, 0, 2 * Math.PI);
-    ctx.fillStyle = COLORS.white;
-    ctx.fill();
-    ctx.strokeStyle = COLORS.accent;
-    ctx.stroke();
-  });
-  ctx.restore();
-}
-
-function getResizeHandle(px, py, shape) {
-  const x0 = shape.width >= 0 ? shape.x : shape.x + shape.width;
-  const y0 = shape.height >= 0 ? shape.y : shape.y + shape.height;
-  const w = Math.abs(shape.width);
-  const h = Math.abs(shape.height);
-  const pad = 6;
-  const handles = [[x0 - pad, y0 - pad], [x0 + w + pad, y0 - pad], [x0 - pad, y0 + h + pad], [x0 + w + pad, y0 + h + pad]];
-  for (let i = 0; i < handles.length; i++) {
-    const [hx, hy] = handles[i];
-    if (Math.hypot(px - hx, py - hy) <= 8) return i;
-  }
-  return -1;
-}
-
-const PenIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/>
-  </svg>
-);
-
-const EraserIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 20H7L3 16c-.8-.8-.8-2 0-2.83L14.17 2c.78-.78 2.05-.78 2.83 0L21 6.17c.78.78.78 2.05 0 2.83L8 22"/><path d="M6.17 7.17l10.66 10.66"/>
-  </svg>
-);
-
-const ShapeIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="8" height="8"/><circle cx="17" cy="7" r="4"/><path d="M12 21l4-8 4 8H12z"/><path d="M3 17h8v4H3z"/>
-  </svg>
-);
-
-const SelectIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M5 3l14 9-7 1-4 7L5 3z"/>
-  </svg>
-);
-
-const UndoIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/>
-  </svg>
-);
-
-const RedoIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 7v6h-6"/><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3L21 13"/>
-  </svg>
-);
-
-const TrashIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
-  </svg>
-);
-
-function SidebarBtn({ icon, label, active, onClick }) {
-  return (
-    <button className={`wb-tool-btn${active ? " active" : ""}`} onClick={onClick}>
-      {icon}
-      <span className="wb-tooltip">{label}</span>
-    </button>
-  );
-}
 
 export default function CanvasBoard() {
   const canvasRef = useRef(null);
@@ -726,8 +187,14 @@ export default function CanvasBoard() {
   }, [redrawCanvas]);
 
   const getPos = (e) => {
-    const rect = canvasRef.current.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY,
+    };
   };
 
   const startDrawing = (e) => {
@@ -738,7 +205,21 @@ export default function CanvasBoard() {
       if (sel) {
         const handle = getResizeHandle(x, y, sel);
         if (handle !== -1) {
-          dragRef.current = { shapeId: sel.id, startX: x, startY: y, origX: sel.x, origY: sel.y, origW: sel.width, origH: sel.height, handle, mode: "resize" };
+          const normX = sel.width >= 0 ? sel.x : sel.x + sel.width;
+          const normY = sel.height >= 0 ? sel.y : sel.y + sel.height;
+          const normW = Math.abs(sel.width);
+          const normH = Math.abs(sel.height);
+          dragRef.current = {
+            shapeId: sel.id,
+            startX: x,
+            startY: y,
+            origX: normX,
+            origY: normY,
+            origW: normW,
+            origH: normH,
+            handle,
+            mode: "resize",
+          };
           return;
         }
       }
@@ -938,16 +419,36 @@ export default function CanvasBoard() {
 
   return (
     <>
-      <style>{styles}</style>
       <div className="wb-shell">
 
-        <aside className="wb-sidebar">
-          <div className="wb-logo">W</div>
+        <aside style={{
+          width: 60,
+          minWidth: 60,
+          height: "100vh",
+          background: "#18181B",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          padding: "16px 0",
+          gap: 4,
+          flexShrink: 0,
+          zIndex: 10,
+          overflow: "visible",
+        }}>
+          <div style={{
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontSize: 18,
+            color: "#FF007F",
+            letterSpacing: "-0.5px",
+            marginBottom: 20,
+            userSelect: "none",
+            fontWeight: 600,
+          }}>Artello</div>
           <SidebarBtn icon={<PenIcon />} label="Pen" active={tool === "pen"} onClick={() => setTool("pen")} />
           <SidebarBtn icon={<EraserIcon />} label="Eraser" active={tool === "eraser"} onClick={() => setTool("eraser")} />
           <SidebarBtn icon={<ShapeIcon />} label="Shapes" active={tool === "shape"} onClick={() => setTool("shape")} />
           <SidebarBtn icon={<SelectIcon />} label="Select & Move" active={tool === "select"} onClick={() => setTool("select")} />
-          <div className="wb-divider" />
+          <div style={{ width: 28, height: 1, background: "#27272A", margin: "6px 0" }} />
         </aside>
 
         <div className="wb-main">

@@ -1,0 +1,350 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@600&display=swap');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: #F7F7F5;
+  overflow: hidden;
+}
+
+.wb-shell {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.wb-sidebar {
+  width: 60px;
+  background: #FF007F;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 0;
+  gap: 4px;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.wb-logo {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 18px;
+  color: #FF007F;
+  letter-spacing: -0.5px;
+  margin-bottom: 20px;
+  user-select: none;
+}
+
+.wb-tool-btn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: #A1A1AA;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.wb-tool-btn svg {
+  stroke: currentColor;
+  display: block;
+  flex-shrink: 0;
+}
+
+.wb-tool-btn:hover {
+  background: #303033;
+  color: #FFFFFF;
+}
+
+.wb-tool-btn.active {
+  background: #3D1428;
+  color: #FF007F;
+}
+
+.wb-tool-btn.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 20px;
+  background: #FF007F;
+  border-radius: 0 3px 3px 0;
+}
+
+.wb-tooltip {
+  position: absolute;
+  left: 52px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #FF007F;
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s;
+  z-index: 100;
+}
+
+.wb-tool-btn:hover .wb-tooltip {
+  opacity: 1;
+}
+
+.wb-divider {
+  width: 28px;
+  height: 1px;
+  background: #27272A;
+  margin: 6px 0;
+}
+
+.wb-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.wb-topbar {
+  height: 52px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E4E7;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.wb-room-input {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid #E4E4E7;
+  border-radius: 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: #FF007F;
+  background: #F7F7F5;
+  outline: none;
+  width: 160px;
+  transition: border-color 0.15s;
+}
+
+.wb-room-input:focus {
+  border-color: #FF007F;
+  background: #FFFFFF;
+}
+
+.wb-room-input::placeholder {
+  color: #71717A;
+}
+
+.wb-join-btn {
+  height: 34px;
+  padding: 0 14px;
+  background: #FF007F;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.wb-join-btn:hover { opacity: 0.88; }
+
+.wb-topbar-sep {
+  width: 1px;
+  height: 22px;
+  background: #E4E4E7;
+  margin: 0 4px;
+}
+
+.wb-top-btn {
+  height: 34px;
+  padding: 0 12px;
+  background: transparent;
+  border: 1px solid #E4E4E7;
+  border-radius: 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: #FF007F;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.wb-top-btn:hover {
+  background: #F7F7F5;
+  border-color: #D4D4D8;
+}
+
+.wb-top-btn.danger {
+  color: #E5484D;
+  border-color: #FECDD3;
+}
+
+.wb-top-btn.danger:hover {
+  background: #FFF1F2;
+}
+
+.wb-shape-select {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid #E4E4E7;
+  border-radius: 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: #FF007F;
+  background: #F7F7F5;
+  outline: none;
+  cursor: pointer;
+}
+
+.wb-color-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.wb-color-label {
+  font-size: 12px;
+  color: #71717A;
+  white-space: nowrap;
+}
+
+.wb-color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #E4E4E7;
+  cursor: pointer;
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.wb-color-swatch input[type="color"] {
+  position: absolute;
+  inset: -4px;
+  width: calc(100% + 8px);
+  height: calc(100% + 8px);
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.wb-color-preview {
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.wb-size-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wb-size-label {
+  font-size: 12px;
+  color: #71717A;
+  width: 42px;
+}
+
+.wb-slider {
+  -webkit-appearance: none;
+  width: 80px;
+  height: 4px;
+  border-radius: 4px;
+  background: #E4E4E7;
+  outline: none;
+  cursor: pointer;
+}
+
+.wb-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #FF007F;
+  cursor: pointer;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+}
+
+.wb-canvas-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #F7F7F5;
+  background-image: radial-gradient(circle, #D4D4D8 1px, transparent 1px);
+  background-size: 24px 24px;
+  overflow: hidden;
+  padding: 20px;
+}
+
+.wb-canvas {
+  border-radius: 6px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06);
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.wb-status {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #FF007F;
+  color: #FFFFFF;
+  font-size: 12px;
+  padding: 7px 14px;
+  border-radius: 20px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 50;
+}
+
+.wb-status.visible {
+  opacity: 1;
+}
+
+.wb-joined-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #16A34A;
+  font-weight: 500;
+  background: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  border-radius: 20px;
+  padding: 4px 10px;
+}
+
+.wb-joined-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #16A34A;
+}

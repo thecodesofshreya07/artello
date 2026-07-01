@@ -84,6 +84,8 @@ io.on("connection", (socket) => {
 
     // ─── SHAPE UPDATE (drag / resize) ───────────────────────────────────────────
     socket.on("shape-update", (data) => {
+        console.log("SHAPE UPDATE:", data.shape);
+
         const { roomId, shape } = data;
         initRoom(roomId);
 
