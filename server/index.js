@@ -13,29 +13,48 @@ const io = new Server(httpServer, {
     cors: { origin: "*" }
 });
 
-/**
- * drawingHistory[roomId] = {
- *   actions: [ [segment, segment, ...], ... ],   // freehand strokes
- *   shapes:  [ shapeObj, ... ],                  // shape objects
- *   undone:  [ { kind: "stroke"|"shape", data }, ... ]  // unified undo stack
- * }
- */
 let drawingHistory = {};
 
 function initRoom(roomId) {
     if (!drawingHistory[roomId]) {
         drawingHistory[roomId] = {
-            actions: [],
-            shapes: [],
-            undone: []
+            events: [],
+            undone: [],
+            canvasColor: "#ffffff"   // NEW
         };
     }
+}
+
+// A freehand stroke is logged as one event PER mouse-move segment, so a
+// single stroke can be dozens of individual "stroke" events in a row. If
+// undo only popped one event at a time, clicking Undo once would shave a
+// single pixel-sized segment off the end of the stroke — visually almost
+// imperceptible. Instead we treat the whole run of same-strokeId events as
+// one undoable action, same as a single shape/text add/update/delete.
+function popLastAction(room) {
+    const events = room.events;
+    if (events.length === 0) return null;
+
+    const last = events[events.length - 1];
+    if (last.type !== "stroke") {
+        return [events.pop()];
+    }
+
+    const strokeId = last.data.strokeId;
+    const batch = [];
+    while (
+        events.length > 0 &&
+        events[events.length - 1].type === "stroke" &&
+        events[events.length - 1].data.strokeId === strokeId
+    ) {
+        batch.unshift(events.pop());
+    }
+    return batch;
 }
 
 io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
-    // ─── JOIN ROOM ──────────────────────────────────────────────────────────────
     socket.on("join-room", (roomId) => {
         socket.join(roomId);
         console.log(`User ${socket.id} joined room ${roomId}`);
@@ -44,144 +63,173 @@ io.on("connection", (socket) => {
         const room = drawingHistory[roomId];
         // Send both stroke history and shapes to the joining user
         socket.emit("init-canvas", {
-            actions: room.actions,
-            shapes: room.shapes
+            events: room.events,
+            canvasColor: room.canvasColor   // NEW
         });
     });
 
-    // ─── FREEHAND DRAW ──────────────────────────────────────────────────────────
+
     socket.on("draw", (data) => {
         const { roomId, ...drawData } = data;
         initRoom(roomId);
-
-        const room = drawingHistory[roomId];
-        const lastStroke = room.actions[room.actions.length - 1];
-
-        if (!lastStroke || lastStroke[0].strokeId !== drawData.strokeId) {
-            room.actions.push([drawData]);
-        } else {
-            lastStroke.push(drawData);
-        }
-
-        // Clear undone stack on any new draw action
-        room.undone = [];
-
-        socket.to(roomId).emit("draw", drawData);
+        const event = {
+            id: drawData.strokeId,
+            type: "stroke",
+            data: drawData,
+            timestamp: Date.now()
+        };
+        drawingHistory[roomId].events.push(event);
+        drawingHistory[roomId].undone = [];
+        socket.to(roomId).emit("event", event);
     });
 
-    // ─── SHAPE ADD ──────────────────────────────────────────────────────────────
+
     socket.on("shape-add", (data) => {
         const { roomId, shape } = data;
         initRoom(roomId);
 
         const room = drawingHistory[roomId];
-        room.shapes.push(shape);
-        room.undone = [];
+        const event = {
+            id: shape.id,
+            type: "shape-add",
+            data: shape,
+            timestamp: Date.now()
+        };
 
-        // Broadcast to everyone including sender confirmation
-        io.to(roomId).emit("shape-add", shape);
+        drawingHistory[roomId].events.push(event);
+        drawingHistory[roomId].undone = [];
+
+        socket.to(roomId).emit("event", event);
     });
 
-    // ─── SHAPE UPDATE (drag / resize) ───────────────────────────────────────────
-    socket.on("shape-update", (data) => {
-        console.log("SHAPE UPDATE:", data.shape);
 
+    socket.on("shape-update", (data) => {
         const { roomId, shape } = data;
         initRoom(roomId);
 
-        const room = drawingHistory[roomId];
-        const idx = room.shapes.findIndex((s) => s.id === shape.id);
-        if (idx !== -1) {
-            room.shapes[idx] = shape;
-        }
+        const event = {
+            id: shape.id,
+            type: "shape-update",
+            data: shape,
+            timestamp: Date.now()
+        };
 
-        socket.to(roomId).emit("shape-update", shape);
+        drawingHistory[roomId].events.push(event);
+        drawingHistory[roomId].undone = [];
+
+        socket.to(roomId).emit("event", event);
     });
 
-    // ─── SHAPE DELETE ───────────────────────────────────────────────────────────
+
     socket.on("shape-delete", (data) => {
         const { roomId, shapeId } = data;
         initRoom(roomId);
 
-        const room = drawingHistory[roomId];
-        const idx = room.shapes.findIndex((s) => s.id === shapeId);
-        if (idx !== -1) {
-            const removed = room.shapes.splice(idx, 1)[0];
-            room.undone = [];
-            io.to(roomId).emit("shape-delete", shapeId);
-        }
+        const event = {
+            id: shapeId,
+            type: "shape-delete",
+            data: { shapeId },
+            timestamp: Date.now()
+        };
+
+        drawingHistory[roomId].events.push(event);
+        drawingHistory[roomId].undone = [];
+
+        socket.to(roomId).emit("event", event);
     });
 
-    // ─── UNDO ───────────────────────────────────────────────────────────────────
+    socket.on("text-add", (data) => {
+        const { roomId, text } = data;
+        initRoom(roomId);
+
+        const event = {
+            id: text.id,
+            type: "text-add",
+            data: text,
+            timestamp: Date.now()
+        };
+
+        drawingHistory[roomId].events.push(event);
+        drawingHistory[roomId].undone = [];
+        socket.to(roomId).emit("event", event);
+    });
+
+    socket.on("text-update", (data) => {
+        const { roomId, text } = data;
+        initRoom(roomId);
+
+        const event = {
+            id: text.id,
+            type: "text-update",
+            data: text,
+            timestamp: Date.now()
+        };
+
+        drawingHistory[roomId].events.push(event);
+        drawingHistory[roomId].undone = [];
+        socket.to(roomId).emit("event", event);
+    });
+
+    socket.on("canvas-color", (data) => {
+    const { roomId, color } = data;
+    initRoom(roomId);
+    drawingHistory[roomId].canvasColor = color;
+    socket.to(roomId).emit("canvas-color", color);
+});
+
     socket.on("undo", (roomId) => {
         initRoom(roomId);
         const room = drawingHistory[roomId];
 
-        // Determine what was added last: a stroke or a shape
-        const lastStrokeTime = room.actions.length > 0
-            ? (room.actions[room.actions.length - 1][0]?.timestamp ?? 0)
-            : 0;
-        const lastShapeTime = room.shapes.length > 0
-            ? (room.shapes[room.shapes.length - 1]?.timestamp ?? 0)
-            : 0;
+        const batch = popLastAction(room);
+        if (!batch) return;
 
-        if (lastStrokeTime === 0 && lastShapeTime === 0) return;
+        // push into redo stack as one unit
+        room.undone.push(batch);
 
-        if (lastShapeTime > lastStrokeTime) {
-            // Undo a shape
-            const removed = room.shapes.pop();
-            room.undone.push({ kind: "shape", data: removed });
-            io.to(roomId).emit("undo", {
-                actions: room.actions,
-                shapes: room.shapes
-            });
-        } else {
-            // Undo a stroke
-            const removed = room.actions.pop();
-            room.undone.push({ kind: "stroke", data: removed });
-            io.to(roomId).emit("undo", {
-                actions: room.actions,
-                shapes: room.shapes
-            });
-        }
+        // Undo removes a whole action from history. There's no generic way
+        // to "subtract" its visual effect on the client, so instead we tell
+        // everyone to rebuild the canvas from the (now shorter) event log.
+        io.to(roomId).emit("canvas-sync", { events: room.events });
     });
 
-    // ─── REDO ───────────────────────────────────────────────────────────────────
     socket.on("redo", (roomId) => {
         initRoom(roomId);
         const room = drawingHistory[roomId];
+
         if (room.undone.length === 0) return;
 
-        const entry = room.undone.pop();
-        if (entry.kind === "shape") {
-            room.shapes.push(entry.data);
-        } else {
-            room.actions.push(entry.data);
-        }
+        const batch = room.undone.pop();
 
-        io.to(roomId).emit("redo", {
-            actions: room.actions,
-            shapes: room.shapes
-        });
+        // re-add the whole action to the main timeline
+        room.events.push(...batch);
+
+        io.to(roomId).emit("canvas-sync", { events: room.events });
     });
 
-    // ─── CLEAR ──────────────────────────────────────────────────────────────────
     socket.on("clear", (roomId) => {
-        drawingHistory[roomId] = {
-            actions: [],
-            shapes: [],
-            undone: []
+        initRoom(roomId);
+        const room = drawingHistory[roomId];
+
+        const event = {
+            id: "clear-" + Date.now(),
+            type: "clear",
+            data: {},
+            timestamp: Date.now()
         };
-        io.to(roomId).emit("clear");
+
+        room.events.push(event);
+        room.undone = []; // IMPORTANT
+
+        socket.to(roomId).emit("event", event);
     });
 
-    // ─── REQUEST SYNC ───────────────────────────────────────────────────────────
     socket.on("request-sync", (roomId) => {
         initRoom(roomId);
         const room = drawingHistory[roomId];
         socket.emit("init-canvas", {
-            actions: room.actions,
-            shapes: room.shapes
+            events: room.events,
+            canvasColor: room.canvasColor   // NEW
         });
     });
 

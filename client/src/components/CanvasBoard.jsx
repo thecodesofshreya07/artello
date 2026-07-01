@@ -37,12 +37,103 @@ export default function CanvasBoard() {
   const [textDraft, setTextDraft] = useState("");
   const [textBox, setTextBox] = useState(null);
 
+  const textsRef = useRef([]);
+
+  // Always point at the latest applyEvent/rebuildFromEvents closures so
+  // socket listeners (registered once on mount) never act on stale state.
+  const applyEventRef = useRef(null);
+  const rebuildFromEventsRef = useRef(null);
+
+  useEffect(() => {
+    textsRef.current = texts;
+  }, [texts]);
+
   useEffect(() => { shapesRef.current = shapes; }, [shapes]);
   useEffect(() => { selectedShapeIdRef.current = selectedShapeId; }, [selectedShapeId]);
 
   const showStatus = (msg) => {
     setStatusMsg(msg);
     setTimeout(() => setStatusMsg(""), 1800);
+  };
+
+  const applyEvent = (event) => {
+    const { type, data } = event;
+
+    switch (type) {
+      case "stroke": {
+        const strokeIndex = strokesRef.current.findIndex(
+          s => s[0]?.strokeId === data.strokeId
+        );
+
+        let updated;
+        if (strokeIndex === -1) {
+          // first point of a brand-new stroke
+          updated = [...strokesRef.current, [data]];
+        } else {
+          // append this point to the stroke it belongs to
+          updated = strokesRef.current.map((s, i) =>
+            i === strokeIndex ? [...s, data] : s
+          );
+        }
+
+        strokesRef.current = updated;
+        redrawCanvas(updated, shapesRef.current);
+        break;
+      }
+
+      case "shape-add": {
+        const updated = [...shapesRef.current, data];
+        shapesRef.current = updated;
+        setShapes(updated);
+        redrawCanvas(strokesRef.current, updated);
+        break;
+      }
+
+      case "shape-update": {
+        const updated = shapesRef.current.map((s) =>
+          s.id === data.id ? data : s
+        );
+        shapesRef.current = updated;
+        setShapes(updated);
+        redrawCanvas(strokesRef.current, updated);
+        break;
+      }
+
+      case "shape-delete": {
+        const updated = shapesRef.current.filter((s) => s.id !== data.shapeId);
+        shapesRef.current = updated;
+        setShapes(updated);
+        redrawCanvas(strokesRef.current, updated);
+        break;
+      }
+      case "text-add": {
+        const updated = [...textsRef.current, data];
+        textsRef.current = updated;
+        setTexts(updated);
+        redrawCanvas(strokesRef.current, shapesRef.current);
+        break;
+      }
+
+      case "text-update": {
+        const updated = textsRef.current.map((t) =>
+          t.id === data.id ? data : t
+        );
+        textsRef.current = updated;
+        setTexts(updated);
+        redrawCanvas(strokesRef.current, shapesRef.current);
+        break;
+      }
+
+      case "clear": {
+        strokesRef.current = [];
+        shapesRef.current = [];
+        textsRef.current = [];
+        setShapes([]);
+        setTexts([]);
+        redrawCanvas([], []);
+        break;
+      }
+    }
   };
 
   const redrawCanvas = useCallback((history, shapeList, preview = null) => {
@@ -71,7 +162,7 @@ export default function CanvasBoard() {
       drawShape(ctx, shape);
       if (shape.id === selectedShapeIdRef.current) drawSelectionHandles(ctx, shape);
     });
-    texts.forEach((textItem) => {
+    textsRef.current.forEach((textItem) => {
       drawTextItem(ctx, textItem);
     });
 
@@ -81,14 +172,15 @@ export default function CanvasBoard() {
       drawShape(ctx, preview);
       ctx.restore();
     }
-  }, [canvasColor, texts]);
+  }, [canvasColor]);
 
   useEffect(() => {
     redrawCanvas(
       strokesRef.current,
       shapesRef.current
     );
-  }, [texts, redrawCanvas]);
+  }, [redrawCanvas]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
@@ -100,106 +192,80 @@ export default function CanvasBoard() {
   }, []);
 
   useEffect(() => {
-    const ctx = contextRef.current;
-    if (!ctx) return;
-    redrawCanvas(strokesRef.current, shapesRef.current);
-  }, [canvasColor, texts]);
-
-  useEffect(() => {
-    const handleRemoteDraw = (d) => {
-      const ctx = contextRef.current;
-      ctx.strokeStyle = d.color;
-      ctx.lineWidth = d.brushSize;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.beginPath();
-      ctx.moveTo(d.x1, d.y1);
-      ctx.lineTo(d.x2, d.y2);
-      ctx.stroke();
+    const handleEvent = (event) => {
+      try {
+        applyEventRef.current(event);
+      } catch (err) {
+        console.error("Failed to apply remote event:", event, err);
+      }
     };
-    socket.on("draw", handleRemoteDraw);
-    return () => socket.off("draw", handleRemoteDraw);
+
+    socket.on("event", handleEvent);
+
+    return () => {
+      socket.off("event", handleEvent);
+    };
   }, []);
 
   useEffect(() => {
+    const ctx = contextRef.current;
+    if (!ctx) return;
+    redrawCanvas(strokesRef.current, shapesRef.current);
+  }, [canvasColor]);
+
+  const rebuildFromEvents = (events) => {
+    strokesRef.current = [];
+    shapesRef.current = [];
+    textsRef.current = [];
+    setShapes([]);
+    setTexts([]);
+    setSelectedShapeId(null);
+
+    // IMPORTANT: rebuild cleanly
+    events.forEach((event) => {
+      try {
+        applyEvent(event);
+      } catch (err) {
+        console.error("Skipping event that failed to apply:", event, err);
+      }
+    });
+  };
+
+  // These handlers are registered once on mount, but they close over
+  // applyEvent/rebuildFromEvents/canvasColor from that specific render.
+  // Routing every call through a ref that's updated on every render keeps
+  // remote events using current state (e.g. the canvas background color)
+  // instead of whatever was current the moment the socket listener attached.
+  applyEventRef.current = applyEvent;
+  rebuildFromEventsRef.current = rebuildFromEvents;
+
+  useEffect(() => {
     const handleInit = (data) => {
-      const actions = data?.actions ?? (Array.isArray(data) ? data : []);
-      const incoming = data?.shapes ?? [];
-      strokesRef.current = actions;
-      shapesRef.current = incoming;
-      setShapes(incoming);
-      redrawCanvas(actions, incoming);
+      if (data?.canvasColor) setCanvasColor(data.canvasColor);   // NEW
+      rebuildFromEventsRef.current(data?.events ?? []);
     };
+
     socket.on("init-canvas", handleInit);
     return () => socket.off("init-canvas", handleInit);
-  }, [redrawCanvas]);
+  }, []);
 
   useEffect(() => {
-    const handleClear = () => {
-      const canvas = canvasRef.current;
-      const ctx = contextRef.current;
-      strokesRef.current = [];
-      shapesRef.current = [];
-      setShapes([]);
-      setSelectedShapeId(null);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = canvasColor;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    };
-    socket.on("clear", handleClear);
-    return () => socket.off("clear", handleClear);
-  }, [canvasColor, texts]);
+    const handleColor = (color) => setCanvasColor(color);
+    socket.on("canvas-color", handleColor);
+    return () => socket.off("canvas-color", handleColor);
+  }, []);
 
   useEffect(() => {
-    const handle = (data) => {
-      const actions = data?.actions ?? [];
-      const incoming = data?.shapes ?? [];
-      strokesRef.current = actions;
-      shapesRef.current = incoming;
-      setShapes(incoming);
-      setSelectedShapeId(null);
-      redrawCanvas(actions, incoming);
+    // Undo/redo can't be represented as a single incremental "event" the way
+    // draw/shape/text actions can, so the server instead sends the full,
+    // corrected event log and every client rebuilds the canvas from it.
+    const handleSync = (data) => {
+      rebuildFromEventsRef.current(data?.events ?? []);
     };
-    socket.on("undo", handle);
-    socket.on("redo", handle);
-    return () => { socket.off("undo", handle); socket.off("redo", handle); };
-  }, [redrawCanvas]);
 
-  useEffect(() => {
-    const handleShapeAdd = (shape) => {
-      console.log("SHAPE ADDED", shape);
-      if (shapesRef.current.find((s) => s.id === shape.id)) return;
-      const updated = [...shapesRef.current, shape];
-      shapesRef.current = updated;
-      setShapes(updated);
-      redrawCanvas(strokesRef.current, updated);
-    };
-    socket.on("shape-add", handleShapeAdd);
-    return () => socket.off("shape-add", handleShapeAdd);
-  }, [redrawCanvas]);
-
-  useEffect(() => {
-    const handleShapeUpdate = (shape) => {
-      const updated = shapesRef.current.map((s) => s.id === shape.id ? shape : s);
-      shapesRef.current = updated;
-      setShapes(updated);
-      redrawCanvas(strokesRef.current, updated);
-    };
-    socket.on("shape-update", handleShapeUpdate);
-    return () => socket.off("shape-update", handleShapeUpdate);
-  }, [redrawCanvas]);
-
-  useEffect(() => {
-    const handleShapeDelete = (shapeId) => {
-      const updated = shapesRef.current.filter((s) => s.id !== shapeId);
-      shapesRef.current = updated;
-      setShapes(updated);
-      if (selectedShapeIdRef.current === shapeId) setSelectedShapeId(null);
-      redrawCanvas(strokesRef.current, updated);
-    };
-    socket.on("shape-delete", handleShapeDelete);
-    return () => socket.off("shape-delete", handleShapeDelete);
-  }, [redrawCanvas]);
+    socket.on("canvas-sync", handleSync);
+    return () => socket.off("canvas-sync", handleSync);
+  }, []);
 
   const getPos = (e) => {
     const canvas = canvasRef.current;
@@ -329,7 +395,7 @@ export default function CanvasBoard() {
         brushSize,
         fill: "transparent",
       };
-      previewShapeRef.current = preview;
+      //previewShapeRef.current = preview;
       redrawCanvas(strokesRef.current, shapesRef.current, preview);
       return;
     }
@@ -382,10 +448,13 @@ export default function CanvasBoard() {
         text: "",
         color: selectedColor,
       };
-      setTexts(prev => [...prev, newText]);
+      const updatedTexts = [...textsRef.current, newText];
+      textsRef.current = updatedTexts;
+      setTexts(updatedTexts);
       setEditingText(newText);
       setTextDraft("");
       isDrawingRef.current = false;
+      socket.emit("text-add", { roomId, text: newText });
       return;
     }
 
@@ -431,15 +500,21 @@ export default function CanvasBoard() {
   };
 
   const clearCanvas = () => {
-    const canvas = canvasRef.current;
-    const ctx = contextRef.current;
+    if (!canvasRef.current || !contextRef.current) return;
+
     strokesRef.current = [];
     shapesRef.current = [];
+    textsRef.current = [];
     setShapes([]);
+    setTexts([]);
     setSelectedShapeId(null);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const ctx = contextRef.current;
+    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+
     ctx.fillStyle = canvasColor;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+
     socket.emit("clear", roomId);
     showStatus("Canvas cleared");
   };
@@ -596,7 +671,11 @@ export default function CanvasBoard() {
               <span className="wb-color-label">Canvas</span>
               <div className="wb-color-swatch">
                 <div className="wb-color-preview" style={{ background: canvasColor }} />
-                <input type="color" value={canvasColor} onChange={(e) => setCanvasColor(e.target.value)} />
+                <input type="color" value={canvasColor} onChange={(e) => {
+                  const color = e.target.value;
+                  setCanvasColor(color);
+                  socket.emit("canvas-color", { roomId, color });
+                }} />
               </div>
             </div>
 
@@ -644,16 +723,17 @@ export default function CanvasBoard() {
                   fontSize: "20px",
                 }}
                 onBlur={() => {
-                  setTexts(prev =>
-                    prev.map(t =>
-                      t.id === editingText.id
-                        ? { ...t, text: textDraft }
-                        : t
-                    )
+                  const finalText = { ...editingText, text: textDraft };
+                  const updatedTexts = textsRef.current.map(t =>
+                    t.id === finalText.id ? finalText : t
                   );
+                  textsRef.current = updatedTexts;
+                  setTexts(updatedTexts);
 
                   setEditingText(null);
                   setTextDraft("");
+
+                  socket.emit("text-update", { roomId, text: finalText });
 
                   redrawCanvas(
                     strokesRef.current,
