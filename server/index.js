@@ -171,11 +171,11 @@ io.on("connection", (socket) => {
     });
 
     socket.on("canvas-color", (data) => {
-    const { roomId, color } = data;
-    initRoom(roomId);
-    drawingHistory[roomId].canvasColor = color;
-    socket.to(roomId).emit("canvas-color", color);
-});
+        const { roomId, color } = data;
+        initRoom(roomId);
+        drawingHistory[roomId].canvasColor = color;
+        socket.to(roomId).emit("canvas-color", color);
+    });
 
     socket.on("undo", (roomId) => {
         initRoom(roomId);
@@ -231,6 +231,24 @@ io.on("connection", (socket) => {
             events: room.events,
             canvasColor: room.canvasColor   // NEW
         });
+    });
+    
+    socket.on("text-delete", (data) => {
+        const { roomId, textId } = data;
+
+        const event = {
+            id: textId,
+            type: "text-delete",
+            data: { textId },
+            timestamp: Date.now(),
+        };
+
+        drawingHistory[roomId].events.push(event);
+
+        socket.to(roomId).emit(
+            "event",
+            event
+        );
     });
 
     socket.on("disconnect", () => {

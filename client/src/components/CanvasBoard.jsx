@@ -4,7 +4,7 @@ import { drawShape, isPointInShape, drawSelectionHandles, getResizeHandle } from
 import { PenIcon, EraserIcon, ShapeIcon, SelectIcon, UndoIcon, RedoIcon, TrashIcon, TextIcon } from "./icons";
 import SidebarBtn from "./SidebarBtn";
 import { socket } from "../services/socket";
-import { drawTextItem } from "../utils/textUtils";
+import { drawTextItem, isPointInText, drawTextSelection, drawTextSelectionHandles, getTextResizeHandle } from "../utils/textUtils";
 
 export default function CanvasBoard() {
   const canvasRef = useRef(null);
@@ -36,6 +36,12 @@ export default function CanvasBoard() {
   const [editingText, setEditingText] = useState(null);
   const [textDraft, setTextDraft] = useState("");
   const [textBox, setTextBox] = useState(null);
+  const [selectedTextId, setSelectedTextId] = useState(null);
+  const selectedTextIdRef = useRef(null);
+
+  useEffect(() => {
+    selectedTextIdRef.current = selectedTextId;
+  }, [selectedTextId]);
 
   const textsRef = useRef([]);
 
@@ -64,7 +70,7 @@ export default function CanvasBoard() {
         const strokeIndex = strokesRef.current.findIndex(
           s => s[0]?.strokeId === data.strokeId
         );
-
+        console.log("STROKE EVENT", event.data);
         let updated;
         if (strokeIndex === -1) {
           // first point of a brand-new stroke
@@ -123,6 +129,22 @@ export default function CanvasBoard() {
         redrawCanvas(strokesRef.current, shapesRef.current);
         break;
       }
+      case "text-delete": {
+        const updated =
+          textsRef.current.filter(
+            t => t.id !== data.textId
+          );
+
+        textsRef.current = updated;
+        setTexts(updated);
+
+        redrawCanvas(
+          strokesRef.current,
+          shapesRef.current
+        );
+
+        break;
+      }
 
       case "clear": {
         strokesRef.current = [];
@@ -147,7 +169,9 @@ export default function CanvasBoard() {
 
     history.forEach((stroke) => {
       stroke.forEach((d) => {
-        ctx.strokeStyle = d.color;
+        ctx.strokeStyle = d.tool === "eraser"
+          ? canvasColor
+          : d.color;
         ctx.lineWidth = d.brushSize;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
@@ -158,12 +182,16 @@ export default function CanvasBoard() {
       });
     });
     //console.log("ALL SHAPES", shapesRef.current);
+
     shapeList.forEach((shape) => {
       drawShape(ctx, shape);
       if (shape.id === selectedShapeIdRef.current) drawSelectionHandles(ctx, shape);
     });
     textsRef.current.forEach((textItem) => {
       drawTextItem(ctx, textItem);
+      if (textItem.id === selectedTextIdRef.current) {
+        drawTextSelectionHandles(ctx, textItem);
+      }
     });
 
     if (preview) {
@@ -194,6 +222,7 @@ export default function CanvasBoard() {
   useEffect(() => {
     const handleEvent = (event) => {
       try {
+        console.log("RECEIVED EVENT", event);
         applyEventRef.current(event);
       } catch (err) {
         console.error("Failed to apply remote event:", event, err);
@@ -281,12 +310,6 @@ export default function CanvasBoard() {
   const startDrawing = (e) => {
     const { x, y } = getPos(e);
     if (tool === "text") {
-      const canvas = canvasRef.current;
-      const rect = canvas.getBoundingClientRect();
-
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-
       setTextBox({
         x,
         y,
@@ -321,6 +344,57 @@ export default function CanvasBoard() {
           return;
         }
       }
+
+      const selText = textsRef.current.find((t) => t.id === selectedTextIdRef.current);
+      if (selText) {
+        const handle = getTextResizeHandle(x, y, selText);
+        if (handle !== -1) {
+          const normX = selText.width >= 0 ? selText.x : selText.x + selText.width;
+          const normY = selText.height >= 0 ? selText.y : selText.y + selText.height;
+          const normW = Math.abs(selText.width);
+          const normH = Math.abs(selText.height);
+          dragRef.current = {
+            mode: "text-resize",
+            textId: selText.id,
+            startX: x,
+            startY: y,
+            origX: normX,
+            origY: normY,
+            origW: normW,
+            origH: normH,
+            handle,
+          };
+          return;
+        }
+      }
+
+      const hitText = [...textsRef.current]
+        .reverse()
+        .find((t) => isPointInText(x, y, t));
+      console.log("TEXTS", textsRef.current);
+      console.log("CLICK", x, y);
+      console.log("HIT TEXT", hitText);
+
+      if (hitText) {
+        setSelectedTextId(hitText.id);
+
+        dragRef.current = {
+          mode: "text-drag",
+          textId: hitText.id,
+          startX: x,
+          startY: y,
+          origX: hitText.x,
+          origY: hitText.y,
+        };
+
+        redrawCanvas(
+          strokesRef.current,
+          shapesRef.current
+        );
+
+        return;
+      }
+
       const hit = [...shapesRef.current].reverse().find((s) => isPointInShape(x, y, s));
       if (hit) {
         setSelectedShapeId(hit.id);
@@ -347,17 +421,70 @@ export default function CanvasBoard() {
   const draw = (e) => {
     const { x, y } = getPos(e);
     if (tool === "text" && textBox && isDrawingRef.current) {
-      const canvas = canvasRef.current;
-      const rect = canvas.getBoundingClientRect();
-
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-
       setTextBox(prev => ({
         ...prev,
         width: x - prev.x,
         height: y - prev.y,
       }));
+
+      return;
+    }
+    if (
+      dragRef.current &&
+      dragRef.current.mode === "text-resize"
+    ) {
+      const { textId, startX, startY, origX, origY, origW, origH, handle } = dragRef.current;
+      const dx = x - startX;
+      const dy = y - startY;
+
+      let nx = origX, ny = origY, nw = origW, nh = origH;
+      if (handle === 0) { nx = origX + dx; ny = origY + dy; nw = origW - dx; nh = origH - dy; }
+      if (handle === 1) { ny = origY + dy; nw = origW + dx; nh = origH - dy; }
+      if (handle === 2) { nx = origX + dx; nw = origW - dx; nh = origH + dy; }
+      if (handle === 3) { nw = origW + dx; nh = origH + dy; }
+
+      const updatedTexts = textsRef.current.map((t) =>
+        t.id === textId ? { ...t, x: nx, y: ny, width: nw, height: nh } : t
+      );
+      textsRef.current = updatedTexts;
+      setTexts(updatedTexts);
+      redrawCanvas(strokesRef.current, shapesRef.current);
+      return;
+    }
+
+    if (
+      dragRef.current &&
+      dragRef.current.mode === "text-drag"
+    ) {
+      const {
+        textId,
+        startX,
+        startY,
+        origX,
+        origY,
+      } = dragRef.current;
+
+      const dx = x - startX;
+      const dy = y - startY;
+
+      const updatedTexts =
+        textsRef.current.map((t) =>
+          t.id === textId
+            ? {
+              ...t,
+              x: origX + dx,
+              y: origY + dy,
+            }
+            : t
+        );
+
+      textsRef.current = updatedTexts;
+      setTexts(updatedTexts);
+
+      redrawCanvas(
+        strokesRef.current,
+        shapesRef.current
+      );
 
       return;
     }
@@ -424,6 +551,7 @@ export default function CanvasBoard() {
       color: tool === "eraser" ? canvasColor : selectedColor,
       brushSize,
     };
+    console.log("SENDING", drawData);
     socket.emit("draw", drawData);
 
     const lastStroke = strokesRef.current[strokesRef.current.length - 1];
@@ -457,14 +585,25 @@ export default function CanvasBoard() {
       socket.emit("text-add", { roomId, text: newText });
       return;
     }
-
+    //
     if (dragRef.current) {
       const finalShape = shapesRef.current.find((s) => s.id === dragRef.current.shapeId);
       if (finalShape) socket.emit("shape-update", { roomId, shape: finalShape });
+
+      if (dragRef.current?.mode === "text-drag") {
+        const movedText = textsRef.current.find(t => t.id === dragRef.current.textId);
+        socket.emit("text-update", { roomId, text: movedText });
+      }
+
+      if (dragRef.current?.mode === "text-resize") {
+        const resizedText = textsRef.current.find(t => t.id === dragRef.current.textId);
+        socket.emit("text-update", { roomId, text: resizedText });
+      }
+
       dragRef.current = null;
       return;
     }
-
+    //
     if (tool === "shape" && shapeStartRef.current && e) {
       const { x, y } = getPos(e);
       const w = x - shapeStartRef.current.x;
@@ -497,6 +636,30 @@ export default function CanvasBoard() {
     }
 
     isDrawingRef.current = false;
+  };
+
+  const deleteSelectedText = () => {
+    if (!selectedTextIdRef.current) return;
+
+    const updated =
+      textsRef.current.filter(
+        t => t.id !== selectedTextIdRef.current
+      );
+
+    textsRef.current = updated;
+    setTexts(updated);
+
+    socket.emit("text-delete", {
+      roomId,
+      textId: selectedTextIdRef.current,
+    });
+
+    setSelectedTextId(null);
+
+    redrawCanvas(
+      strokesRef.current,
+      shapesRef.current
+    );
   };
 
   const clearCanvas = () => {
@@ -540,9 +703,14 @@ export default function CanvasBoard() {
 
   useEffect(() => {
     const handleKey = (e) => {
-      if ((e.key === "Delete" || e.key === "Backspace") && selectedShapeIdRef.current) {
-        e.preventDefault();
-        deleteSelectedShape();
+      if (e.key === "Delete" || e.key === "Backspace") {
+        if (selectedShapeIdRef.current) {
+          e.preventDefault();
+          deleteSelectedShape();
+        } else if (selectedTextIdRef.current) {
+          e.preventDefault();
+          deleteSelectedText();
+        }
       }
     };
     window.addEventListener("keydown", handleKey);
@@ -645,6 +813,14 @@ export default function CanvasBoard() {
                 </button>
               </>
             )}
+            {selectedTextId && (
+              <>
+                <div className="wb-topbar-sep" />
+                <button className="wb-top-btn danger" onClick={deleteSelectedText}>
+                  <TrashIcon /> Delete text
+                </button>
+              </>
+            )}
 
             <div className="wb-topbar-sep" style={{ marginLeft: "auto" }} />
 
@@ -705,43 +881,50 @@ export default function CanvasBoard() {
               onMouseLeave={stopDrawing}
             />
 
-            {editingText && (
-              <textarea
-                autoFocus
-                value={textDraft}
-                onChange={(e) => setTextDraft(e.target.value)}
-                style={{
-                  position: "absolute",
-                  left: editingText.x + (canvasRef.current?.offsetLeft || 0),
-                  top: editingText.y + (canvasRef.current?.offsetTop || 0),
-                  width: Math.abs(editingText.width),
-                  height: Math.abs(editingText.height),
-                  resize: "none",
-                  border: "1px dashed #ff69b4",
-                  background: "transparent",
-                  outline: "none",
-                  fontSize: "20px",
-                }}
-                onBlur={() => {
-                  const finalText = { ...editingText, text: textDraft };
-                  const updatedTexts = textsRef.current.map(t =>
-                    t.id === finalText.id ? finalText : t
-                  );
-                  textsRef.current = updatedTexts;
-                  setTexts(updatedTexts);
+            {editingText && (() => {
+              const canvas = canvasRef.current;
+              const rect = canvas?.getBoundingClientRect();
+              const scaleX = rect ? canvas.width / rect.width : 1;
+              const scaleY = rect ? canvas.height / rect.height : 1;
 
-                  setEditingText(null);
-                  setTextDraft("");
+              return (
+                <textarea
+                  autoFocus
+                  value={textDraft}
+                  onChange={(e) => setTextDraft(e.target.value)}
+                  style={{
+                    position: "absolute",
+                    left: editingText.x / scaleX + (canvas?.offsetLeft || 0),
+                    top: editingText.y / scaleY + (canvas?.offsetTop || 0),
+                    width: Math.abs(editingText.width) / scaleX,
+                    height: Math.abs(editingText.height) / scaleY,
+                    resize: "none",
+                    border: "1px dashed #ff69b4",
+                    background: "transparent",
+                    outline: "none",
+                    fontSize: "20px",
+                  }}
+                  onBlur={() => {
+                    const finalText = { ...editingText, text: textDraft };
+                    const updatedTexts = textsRef.current.map(t =>
+                      t.id === finalText.id ? finalText : t
+                    );
+                    textsRef.current = updatedTexts;
+                    setTexts(updatedTexts);
 
-                  socket.emit("text-update", { roomId, text: finalText });
+                    setEditingText(null);
+                    setTextDraft("");
 
-                  redrawCanvas(
-                    strokesRef.current,
-                    shapesRef.current
-                  );
-                }}
-              />
-            )}
+                    socket.emit("text-update", { roomId, text: finalText });
+
+                    redrawCanvas(
+                      strokesRef.current,
+                      shapesRef.current
+                    );
+                  }}
+                />
+              );
+            })()}
           </div>
         </div>
         <div className={`wb-status${statusMsg ? " visible" : ""}`}>
