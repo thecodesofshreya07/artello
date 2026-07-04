@@ -12,7 +12,7 @@ export function drawTextItem(ctx, textItem) {
 
   const lines = textItem.text.split("\n");
   const rawSize = h / Math.max(lines.length, 1);
-  const fontSize = Math.max(12, Math.min(36, rawSize * 0.5));
+  const fontSize = Math.max(12, Math.min(126, rawSize * 0.5));
   ctx.font = `${fontSize}px Arial`;
 
   lines.forEach((line, index) => {
