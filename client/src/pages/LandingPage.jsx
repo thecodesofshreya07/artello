@@ -58,9 +58,9 @@ export default function LandingPage() {
         </div>
         <pre>
           <code className="code-content">
-            <span className="comment">// No signup. No bloat. O(1) friction.</span>
+            <span className="comment">// No signup. Instant sketch board.</span>
             {"\n"}
-            <span className="keyword">const</span> <span class="variable">artello</span> = () =&gt; <span className="string">'click'</span> ➔ <span className="string">'share'</span> ➔ <span className="string">'sketch'</span>;
+            <span className="keyword">const</span> <span className="variable">artello</span> = () =&gt; <span className="string">'sketch'</span>;
           </code>
         </pre>
       </div>

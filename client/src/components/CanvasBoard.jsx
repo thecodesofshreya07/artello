@@ -265,6 +265,9 @@ export default function CanvasBoard({ roomCode, title }) {
         console.error("Skipping event that failed to apply:", event, err);
       }
     });
+
+    // Redraw at the end of the rebuild process to ensure the canvas is updated, especially if events is empty
+    redrawCanvas(strokesRef.current, shapesRef.current);
   };
 
   // These handlers are registered once on mount, but they close over
@@ -303,34 +306,52 @@ export default function CanvasBoard({ roomCode, title }) {
     return () => socket.off("canvas-sync", handleSync);
   }, []);
 
-  const getTouchPos = (touch) => {
+  const startDrawingRef = useRef(null);
+  const drawRefFunc = useRef(null);
+  const stopDrawingRef = useRef(null);
+
+  useEffect(() => {
+    startDrawingRef.current = startDrawing;
+    drawRefFunc.current = draw;
+    stopDrawingRef.current = stopDrawing;
+  });
+
+  useEffect(() => {
     const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    return {
-      x: (touch.clientX - rect.left) * scaleX,
-      y: (touch.clientY - rect.top) * scaleY,
+    if (!canvas) return;
+
+    const handleStart = (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      if (touch) {
+        startDrawingRef.current({ clientX: touch.clientX, clientY: touch.clientY });
+      }
     };
-  };
 
-  const handleTouchStart = (e) => {
-    e.preventDefault();
-    const touch = e.touches[0];
-    startDrawing({ clientX: touch.clientX, clientY: touch.clientY });
-  };
+    const handleMove = (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      if (touch) {
+        drawRefFunc.current({ clientX: touch.clientX, clientY: touch.clientY });
+      }
+    };
 
-  const handleTouchMove = (e) => {
-    e.preventDefault();
-    const touch = e.touches[0];
-    draw({ clientX: touch.clientX, clientY: touch.clientY });
-  };
+    const handleEnd = (e) => {
+      e.preventDefault();
+      const touch = e.changedTouches[0] || e.touches[0];
+      stopDrawingRef.current(touch ? { clientX: touch.clientX, clientY: touch.clientY } : null);
+    };
 
-  const handleTouchEnd = (e) => {
-    e.preventDefault();
-    const touch = e.changedTouches[0];
-    stopDrawing(touch ? { clientX: touch.clientX, clientY: touch.clientY } : null);
-  };
+    canvas.addEventListener("touchstart", handleStart, { passive: false });
+    canvas.addEventListener("touchmove", handleMove, { passive: false });
+    canvas.addEventListener("touchend", handleEnd, { passive: false });
+
+    return () => {
+      canvas.removeEventListener("touchstart", handleStart);
+      canvas.removeEventListener("touchmove", handleMove);
+      canvas.removeEventListener("touchend", handleEnd);
+    };
+  }, []);
 
   const getPos = (e) => {
     const canvas = canvasRef.current;
@@ -413,6 +434,7 @@ export default function CanvasBoard({ roomCode, title }) {
 
       if (hitText) {
         setSelectedTextId(hitText.id);
+        setSelectedShapeId(null);
 
         dragRef.current = {
           mode: "text-drag",
@@ -434,10 +456,12 @@ export default function CanvasBoard({ roomCode, title }) {
       const hit = [...shapesRef.current].reverse().find((s) => isPointInShape(x, y, s));
       if (hit) {
         setSelectedShapeId(hit.id);
+        setSelectedTextId(null);
         dragRef.current = { shapeId: hit.id, startX: x, startY: y, origX: hit.x, origY: hit.y, origW: hit.width, origH: hit.height, handle: -1, mode: "drag" };
         redrawCanvas(strokesRef.current, shapesRef.current);
       } else {
         setSelectedShapeId(null);
+        setSelectedTextId(null);
         redrawCanvas(strokesRef.current, shapesRef.current);
       }
       return;
@@ -587,6 +611,7 @@ export default function CanvasBoard({ roomCode, title }) {
       y2: y,
       color: tool === "eraser" ? canvasColor : selectedColor,
       brushSize,
+      userId: identity.id,
     };
     console.log("SENDING", drawData);
     socket.emit("draw", drawData);
@@ -619,22 +644,22 @@ export default function CanvasBoard({ roomCode, title }) {
       setEditingText(newText);
       setTextDraft("");
       isDrawingRef.current = false;
-      socket.emit("text-add", { roomId, text: newText });
+      socket.emit("text-add", { roomId, text: { ...newText, userId: identity.id }, userId: identity.id });
       return;
     }
     //
     if (dragRef.current) {
       const finalShape = shapesRef.current.find((s) => s.id === dragRef.current.shapeId);
-      if (finalShape) socket.emit("shape-update", { roomId, shape: finalShape });
+      if (finalShape) socket.emit("shape-update", { roomId, shape: finalShape, userId: identity.id });
 
       if (dragRef.current?.mode === "text-drag") {
         const movedText = textsRef.current.find(t => t.id === dragRef.current.textId);
-        socket.emit("text-update", { roomId, text: movedText });
+        socket.emit("text-update", { roomId, text: movedText, userId: identity.id });
       }
 
       if (dragRef.current?.mode === "text-resize") {
         const resizedText = textsRef.current.find(t => t.id === dragRef.current.textId);
-        socket.emit("text-update", { roomId, text: resizedText });
+        socket.emit("text-update", { roomId, text: resizedText, userId: identity.id });
       }
 
       dragRef.current = null;
@@ -662,7 +687,7 @@ export default function CanvasBoard({ roomCode, title }) {
         shapesRef.current = updated;
         setShapes(updated);
         setSelectedShapeId(newShape.id);
-        socket.emit("shape-add", { roomId, shape: newShape });
+        socket.emit("shape-add", { roomId, shape: { ...newShape, userId: identity.id }, userId: identity.id });
         redrawCanvas(strokesRef.current, updated);
       } else {
         redrawCanvas(strokesRef.current, shapesRef.current);
@@ -689,6 +714,7 @@ export default function CanvasBoard({ roomCode, title }) {
     socket.emit("text-delete", {
       roomId,
       textId: selectedTextIdRef.current,
+      userId: identity.id,
     });
 
     setSelectedTextId(null);
@@ -715,7 +741,7 @@ export default function CanvasBoard({ roomCode, title }) {
     ctx.fillStyle = canvasColor;
     ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
 
-    socket.emit("clear", roomId);
+    socket.emit("clear", { roomId, userId: identity.id });
     showStatus("Canvas cleared");
   };
 
@@ -738,7 +764,7 @@ export default function CanvasBoard({ roomCode, title }) {
     shapesRef.current = updated;
     setShapes(updated);
     setSelectedShapeId(null);
-    socket.emit("shape-delete", { roomId, shapeId });
+    socket.emit("shape-delete", { roomId, shapeId, userId: identity.id });
     redrawCanvas(strokesRef.current, updated);
     showStatus("Shape deleted");
   };
@@ -770,29 +796,8 @@ export default function CanvasBoard({ roomCode, title }) {
     <>
       <div className="wb-shell">
 
-        <aside style={{
-          width: 60,
-          minWidth: 60,
-          height: "100vh",
-          background: "#18181B",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          padding: "16px 0",
-          gap: 4,
-          flexShrink: 0,
-          zIndex: 10,
-          overflow: "visible",
-        }}>
-          <div style={{
-            fontFamily: "'Space Grotesk', sans-serif",
-            fontSize: 18,
-            color: "#FF007F",
-            letterSpacing: "-0.5px",
-            marginBottom: 20,
-            userSelect: "none",
-            fontWeight: 600,
-          }}>Artello</div>
+        <aside className="wb-sidebar">
+          <div className="wb-logo" style={{ fontWeight: 600 }}>Artello</div>
           <SidebarBtn icon={<PenIcon />} label="Pen" active={tool === "pen"} onClick={() => setTool("pen")} />
           <SidebarBtn icon={<EraserIcon />} label="Eraser" active={tool === "eraser"} onClick={() => setTool("eraser")} />
           <SidebarBtn icon={<ShapeIcon />} label="Shapes" active={tool === "shape"} onClick={() => setTool("shape")} />
@@ -803,7 +808,7 @@ export default function CanvasBoard({ roomCode, title }) {
             active={tool === "text"}
             onClick={() => setTool("text")}
           />
-          <div style={{ width: 28, height: 1, background: "#27272A", margin: "6px 0" }} />
+          <div className="wb-divider" />
         </aside>
 
         <div className="wb-main">
@@ -851,6 +856,54 @@ export default function CanvasBoard({ roomCode, title }) {
               </>
             )}
 
+            {(selectedShapeId || selectedTextId) && (() => {
+              const selectedItem = selectedShapeId 
+                ? shapes.find(s => s.id === selectedShapeId)
+                : selectedTextId 
+                  ? texts.find(t => t.id === selectedTextId)
+                  : null;
+
+              if (!selectedItem) return null;
+
+              return (
+                <>
+                  <div className="wb-topbar-sep" />
+                  <div className="wb-color-row">
+                    <span className="wb-color-label">Recolor</span>
+                    <div className="wb-color-swatch">
+                      <div className="wb-color-preview" style={{ background: selectedItem.color || "#000000" }} />
+                      <input 
+                        type="color" 
+                        value={selectedItem.color || "#000000"} 
+                        onChange={(e) => {
+                          const newColor = e.target.value;
+                          if (selectedShapeId) {
+                            const updatedShapes = shapes.map(s => 
+                              s.id === selectedShapeId ? { ...s, color: newColor } : s
+                            );
+                            setShapes(updatedShapes);
+                            shapesRef.current = updatedShapes;
+                            const updatedShape = updatedShapes.find(s => s.id === selectedShapeId);
+                            socket.emit("shape-update", { roomId, shape: updatedShape, userId: identity.id });
+                            redrawCanvas(strokesRef.current, updatedShapes);
+                          } else if (selectedTextId) {
+                            const updatedTexts = texts.map(t => 
+                              t.id === selectedTextId ? { ...t, color: newColor } : t
+                            );
+                            setTexts(updatedTexts);
+                            textsRef.current = updatedTexts;
+                            const updatedText = updatedTexts.find(t => t.id === selectedTextId);
+                            socket.emit("text-update", { roomId, text: updatedText, userId: identity.id });
+                            redrawCanvas(strokesRef.current, shapesRef.current);
+                          }
+                        }} 
+                      />
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+
             <div className="wb-topbar-sep" style={{ marginLeft: "auto" }} />
 
             <div className="wb-size-row">
@@ -886,10 +939,10 @@ export default function CanvasBoard({ roomCode, title }) {
 
             <div className="wb-topbar-sep" />
 
-            <button className="wb-top-btn" onClick={() => { socket.emit("undo", roomId); showStatus("Undo"); }}>
+            <button className="wb-top-btn" onClick={() => { socket.emit("undo", { roomId, userId: identity.id }); showStatus("Undo"); }}>
               <UndoIcon /> Undo
             </button>
-            <button className="wb-top-btn" onClick={() => { socket.emit("redo", roomId); showStatus("Redo"); }}>
+            <button className="wb-top-btn" onClick={() => { socket.emit("redo", { roomId, userId: identity.id }); showStatus("Redo"); }}>
               <RedoIcon /> Redo
             </button>
             <button className="wb-top-btn danger" onClick={clearCanvas}>
@@ -912,9 +965,6 @@ export default function CanvasBoard({ roomCode, title }) {
               onMouseMove={draw}
               onMouseUp={stopDrawing}
               onMouseLeave={stopDrawing}
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
             />
             <CursorLayer remoteUsers={remoteUsers} canvasRef={canvasRef} />
 

@@ -6,6 +6,7 @@ const { Schema } = mongoose;
 const StrokeSegmentSchema = new Schema(
   {
     strokeId: String,
+    userId: String,
     tool: String,
     x1: Number,
     y1: Number,

@@ -17,7 +17,9 @@ body {
 
 .wb-sidebar {
   width: 60px;
-  background: #FF007F;
+  min-width: 60px;
+  height: 100vh;
+  background: #18181B;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -25,6 +27,7 @@ body {
   gap: 4px;
   flex-shrink: 0;
   z-index: 10;
+  overflow: visible;
 }
 
 .wb-logo {
@@ -670,6 +673,8 @@ body {
   color: #e1e1e6;
   font-size: 14px;
   line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
 /* Syntax Highlighting to match dark mode aesthetics */
@@ -678,9 +683,6 @@ body {
 .variable { color: #50fa7b; }
 .string { color: #f1fa8c; }
 
-/* ============================================================
-   MOBILE UI OPTIMIZATIONS (Max-width: 768px)
-   ============================================================ */
 /* ============================================================
    MOBILE UI OPTIMIZATIONS (Max-width: 768px)
    ============================================================ */
@@ -693,47 +695,45 @@ body {
     height: 100%;
   }
 
-  /* 2. Re-arrange the main outer layout container to stack cleanly */
+  /* 2. Keep the main outer layout horizontal (sidebar on the left) */
   .wb-shell {
-    flex-direction: column-reverse !important; /* Pushes tools to the bottom bar, main content to top */
+    flex-direction: row !important;
     height: 100vh !important;
     width: 100vw !important;
     overflow: hidden !important;
   }
 
-  /* 3. FIX: Restructure the main container wrapper to stretch full height */
+  /* 3. Restructure the main container wrapper */
   .wb-main {
     flex: 1 !important;
     display: flex !important;
     flex-direction: column !important;
-    height: calc(100vh - 60px) !important; /* Total height minus the 60px bottom bar */
-    width: 100% !important;
+    height: 100vh !important;
+    width: calc(100% - 44px) !important;
     overflow: hidden !important;
   }
 
-  /* 4. FIX VISIBILITY: Force top navigation action ribbon to appear */
+  /* 4. Top toolbar: wrap onto multiple rows cleanly */
   .wb-topbar {
     display: flex !important;
     flex-direction: row !important;
-    flex-wrap: nowrap !important; /* Halts vertical row breaks */
+    flex-wrap: wrap !important;
     justify-content: flex-start !important;
     align-items: center !important;
-    height: 56px !important;
+    height: auto !important;
     min-height: 56px !important;
     width: 100% !important;
-    padding: 0 12px !important;
-    gap: 12px !important;
-    overflow-x: auto !important; /* Allows horizontal swipes on compact viewports */
+    padding: 8px 12px !important;
+    gap: 8px 12px !important;
+    overflow-x: visible !important;
     border-bottom: 1px solid #E4E4E7 !important;
     background: #FFFFFF !important;
     z-index: 20 !important;
-    -webkit-overflow-scrolling: touch;
   }
 
   /* Hide messy desktop annotations to rescue horizontal real estate */
   .wb-size-row .wb-size-label,
   .wb-color-row .wb-color-label,
-  .wb-board-title,
   .wb-topbar-sep,
   .wb-logo,
   .wb-tooltip,
@@ -741,61 +741,62 @@ body {
     display: none !important;
   }
 
+  /* Adjust slider and color rows to be compact and self-contained */
   .wb-slider {
-    width: 60px !important;
+    width: 70px !important;
   }
 
   .wb-color-row {
-    margin-left: auto !important; /* Snaps color choices cleanly to the right edge */
+    margin-left: 0 !important;
+    gap: 8px !important;
   }
 
-  /* 5. Clean Canvas Viewport Calculation */
+  .wb-size-row {
+    gap: 6px !important;
+  }
+
+  /* 5. Clean Canvas Viewport Calculation with Horizontal Scroll */
   .wb-canvas-wrap {
     flex: 1 !important;
-    height: calc(100% - 56px) !important; /* Fills remaining height below topbar */
+    height: 100% !important;
     width: 100% !important;
     padding: 8px !important;
     display: flex !important;
     align-items: center !important;
-    justify-content: center !important;
+    justify-content: flex-start !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
   }
 
   .wb-canvas {
-    max-width: 100% !important;
+    height: 100% !important;
+    width: auto !important;
+    max-width: none !important;
     max-height: 100% !important;
-    object-fit: contain !important;
+    display: block !important;
+    flex-shrink: 0 !important;
   }
 
-  /* 6. Sidebar Conversion to Navigation Tab bar */
+  /* 6. Sidebar remains on the left but shrinks to 44px */
   .wb-sidebar {
-    width: 100% !important;
-    min-width: 100% !important;
-    height: 60px !important;
-    min-height: 60px !important;
-    flex-direction: row !important;
-    justify-content: space-around !important;
+    width: 44px !important;
+    min-width: 44px !important;
+    height: 100vh !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
     align-items: center !important;
-    padding: 0 16px !important;
-    gap: 0 !important;
-    background: #FF007F !important;
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1) !important;
-    z-index: 30 !important;
+    padding: 12px 0 !important;
+    gap: 8px !important;
+    background: #18181B !important;
+    box-shadow: none !important;
+    z-index: 10 !important;
   }
 
   .wb-tool-btn {
     width: 44px !important;
     height: 44px !important;
-    border-radius: 50% !important;
-  }
-
-  .wb-tool-btn.active::before {
-    left: 50% !important;
-    top: auto !important;
-    bottom: 2px !important;
-    transform: translateX(-50%) !important;
-    width: 16px !important;
-    height: 3px !important;
-    border-radius: 3px 3px 0 0 !important;
+    border-radius: 8px !important;
   }
 
   /* 7. Landing Page Fixes */

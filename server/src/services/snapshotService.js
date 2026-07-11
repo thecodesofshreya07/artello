@@ -69,6 +69,7 @@ function buildEventsFromSnapshot(snapshot) {
       events.push({
         id: seg.strokeId,
         type: "stroke",
+        userId: seg.userId,
         data: seg,
         timestamp: seg.timestamp || Date.now(),
       });
@@ -76,11 +77,23 @@ function buildEventsFromSnapshot(snapshot) {
   });
 
   (snapshot.shapes || []).forEach((shape) => {
-    events.push({ id: shape.id, type: "shape-add", data: shape, timestamp: shape.timestamp || Date.now() });
+    events.push({
+      id: shape.id,
+      type: "shape-add",
+      userId: shape.userId,
+      data: shape,
+      timestamp: shape.timestamp || Date.now(),
+    });
   });
 
   (snapshot.texts || []).forEach((text) => {
-    events.push({ id: text.id, type: "text-add", data: text, timestamp: Date.now() });
+    events.push({
+      id: text.id,
+      type: "text-add",
+      userId: text.userId,
+      data: text,
+      timestamp: Date.now(),
+    });
   });
 
   return events;

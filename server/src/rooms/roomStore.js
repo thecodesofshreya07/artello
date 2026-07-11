@@ -5,7 +5,7 @@ const rooms = new Map(); // roomCode -> in-memory room state
 function createEmptyRoom(overrides = {}) {
   return {
     events: [],
-    undone: [],
+    undoneMap: {},
     canvasColor: "#ffffff",
     title: "",
     dirty: false,
@@ -44,24 +44,42 @@ async function ensureRoom(roomCode) {
 // single pixel-sized segment off the end of the stroke - visually almost
 // imperceptible. Instead we treat the whole run of same-strokeId events as
 // one undoable action, same as a single shape/text add/update/delete.
-function popLastAction(room) {
+// Scoped to the acting user.
+function popUserLastAction(room, userId) {
   const events = room.events;
-  if (events.length === 0) return null;
+  if (!events || events.length === 0) return null;
 
-  const last = events[events.length - 1];
-  if (last.type !== "stroke") {
-    return [events.pop()];
+  // Find the last event matching the userId
+  let lastMatchIndex = -1;
+  for (let i = events.length - 1; i >= 0; i--) {
+    if (events[i].userId === userId) {
+      lastMatchIndex = i;
+      break;
+    }
   }
 
-  const strokeId = last.data.strokeId;
+  if (lastMatchIndex === -1) return null;
+
+  const lastEvent = events[lastMatchIndex];
+  if (lastEvent.type !== "stroke") {
+    // Single event action (shape-add, shape-update, shape-delete, text-add, text-update, text-delete, clear)
+    events.splice(lastMatchIndex, 1);
+    return [lastEvent];
+  }
+
+  // It's a stroke, retrieve all events with the same strokeId
+  const strokeId = lastEvent.data.strokeId;
   const batch = [];
-  while (
-    events.length > 0 &&
-    events[events.length - 1].type === "stroke" &&
-    events[events.length - 1].data.strokeId === strokeId
-  ) {
-    batch.unshift(events.pop());
+  const remainingEvents = [];
+  for (let i = 0; i < events.length; i++) {
+    const ev = events[i];
+    if (ev.userId === userId && ev.type === "stroke" && ev.data?.strokeId === strokeId) {
+      batch.push(ev);
+    } else {
+      remainingEvents.push(ev);
+    }
   }
+  room.events = remainingEvents;
   return batch;
 }
 
@@ -69,4 +87,4 @@ function removeRoom(roomCode) {
   rooms.delete(roomCode);
 }
 
-module.exports = { rooms, getRoom, ensureRoom, popLastAction, removeRoom };
+module.exports = { rooms, getRoom, ensureRoom, popUserLastAction, removeRoom };

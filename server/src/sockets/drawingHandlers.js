@@ -1,74 +1,81 @@
-const { ensureRoom, popLastAction } = require("../rooms/roomStore");
+const { ensureRoom, popUserLastAction } = require("../rooms/roomStore");
 const { scheduleSave } = require("../services/boardPersistenceService");
 
 function registerDrawingHandlers(io, socket) {
   function pushEvent(room, roomCode, event) {
     room.events.push(event);
-    room.undone = [];
+    if (!room.undoneMap) {
+      room.undoneMap = {};
+    }
+    room.undoneMap[event.userId] = [];
     scheduleSave(roomCode, room, io);
   }
 
   socket.on("draw", async (data) => {
     const { roomId: roomCode, ...drawData } = data;
     const room = await ensureRoom(roomCode);
-    const event = { id: drawData.strokeId, type: "stroke", data: drawData, timestamp: Date.now() };
+    const event = { id: drawData.strokeId, type: "stroke", userId: drawData.userId, data: drawData, timestamp: Date.now() };
     pushEvent(room, roomCode, event);
     socket.to(roomCode).emit("event", event);
   });
 
   socket.on("shape-add", async (data) => {
-    const { roomId: roomCode, shape } = data;
+    const { roomId: roomCode, shape, userId } = data;
     const room = await ensureRoom(roomCode);
-    const event = { id: shape.id, type: "shape-add", data: shape, timestamp: Date.now() };
+    const event = { id: shape.id, type: "shape-add", userId, data: shape, timestamp: Date.now() };
     pushEvent(room, roomCode, event);
     socket.to(roomCode).emit("event", event);
   });
 
   socket.on("shape-update", async (data) => {
-    const { roomId: roomCode, shape } = data;
+    const { roomId: roomCode, shape, userId } = data;
     const room = await ensureRoom(roomCode);
-    const event = { id: shape.id, type: "shape-update", data: shape, timestamp: Date.now() };
+    const event = { id: shape.id, type: "shape-update", userId, data: shape, timestamp: Date.now() };
     pushEvent(room, roomCode, event);
     socket.to(roomCode).emit("event", event);
   });
 
   socket.on("shape-delete", async (data) => {
-    const { roomId: roomCode, shapeId } = data;
+    const { roomId: roomCode, shapeId, userId } = data;
     const room = await ensureRoom(roomCode);
-    const event = { id: shapeId, type: "shape-delete", data: { shapeId }, timestamp: Date.now() };
+    const event = { id: shapeId, type: "shape-delete", userId, data: { shapeId }, timestamp: Date.now() };
     pushEvent(room, roomCode, event);
     socket.to(roomCode).emit("event", event);
   });
 
   socket.on("text-add", async (data) => {
-    const { roomId: roomCode, text } = data;
+    const { roomId: roomCode, text, userId } = data;
     const room = await ensureRoom(roomCode);
-    const event = { id: text.id, type: "text-add", data: text, timestamp: Date.now() };
+    const event = { id: text.id, type: "text-add", userId, data: text, timestamp: Date.now() };
     pushEvent(room, roomCode, event);
     socket.to(roomCode).emit("event", event);
   });
 
   socket.on("text-update", async (data) => {
-    const { roomId: roomCode, text } = data;
+    const { roomId: roomCode, text, userId } = data;
     const room = await ensureRoom(roomCode);
-    const event = { id: text.id, type: "text-update", data: text, timestamp: Date.now() };
+    const event = { id: text.id, type: "text-update", userId, data: text, timestamp: Date.now() };
     pushEvent(room, roomCode, event);
     socket.to(roomCode).emit("event", event);
   });
 
   socket.on("text-delete", async (data) => {
-    const { roomId: roomCode, textId } = data;
+    const { roomId: roomCode, textId, userId } = data;
     const room = await ensureRoom(roomCode);
-    const event = { id: textId, type: "text-delete", data: { textId }, timestamp: Date.now() };
+    const event = { id: textId, type: "text-delete", userId, data: { textId }, timestamp: Date.now() };
     pushEvent(room, roomCode, event);
     socket.to(roomCode).emit("event", event);
   });
 
-  socket.on("clear", async (roomCode) => {
+  socket.on("clear", async (data) => {
+    const { roomId: roomCode, userId } = typeof data === "string" ? { roomId: data } : data;
     const room = await ensureRoom(roomCode);
-    const event = { id: "clear-" + Date.now(), type: "clear", data: {}, timestamp: Date.now() };
+    const event = { id: "clear-" + Date.now(), type: "clear", userId, data: {}, timestamp: Date.now() };
     room.events.push(event);
-    room.undone = [];
+    if (!room.undoneMap) {
+      room.undoneMap = {};
+    }
+    room.undoneMap[userId] = [];
     scheduleSave(roomCode, room, io);
     socket.to(roomCode).emit("event", event);
   });
@@ -81,19 +88,26 @@ function registerDrawingHandlers(io, socket) {
     socket.to(roomCode).emit("canvas-color", color);
   });
 
-  socket.on("undo", async (roomCode) => {
+  socket.on("undo", async (data) => {
+    const { roomId: roomCode, userId } = typeof data === "string" ? { roomId: data } : data;
     const room = await ensureRoom(roomCode);
-    const batch = popLastAction(room);
+    const batch = popUserLastAction(room, userId);
     if (!batch) return;
-    room.undone.push(batch);
+    if (!room.undoneMap) room.undoneMap = {};
+    if (!room.undoneMap[userId]) room.undoneMap[userId] = [];
+    room.undoneMap[userId].push(batch);
+    if (room.undoneMap[userId].length > 50) {
+      room.undoneMap[userId].shift();
+    }
     scheduleSave(roomCode, room, io);
     io.to(roomCode).emit("canvas-sync", { events: room.events });
   });
 
-  socket.on("redo", async (roomCode) => {
+  socket.on("redo", async (data) => {
+    const { roomId: roomCode, userId } = typeof data === "string" ? { roomId: data } : data;
     const room = await ensureRoom(roomCode);
-    if (room.undone.length === 0) return;
-    const batch = room.undone.pop();
+    if (!room.undoneMap || !room.undoneMap[userId] || room.undoneMap[userId].length === 0) return;
+    const batch = room.undoneMap[userId].pop();
     room.events.push(...batch);
     scheduleSave(roomCode, room, io);
     io.to(roomCode).emit("canvas-sync", { events: room.events });
