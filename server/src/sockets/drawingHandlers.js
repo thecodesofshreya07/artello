@@ -2,6 +2,8 @@ const { ensureRoom, popUserLastAction } = require("../rooms/roomStore");
 const { scheduleSave } = require("../services/boardPersistenceService");
 
 function registerDrawingHandlers(io, socket) {
+  const FLATTEN_THRESHOLD = 400;
+
   function pushEvent(room, roomCode, event) {
     room.events.push(event);
     if (!room.undoneMap) {
@@ -9,6 +11,13 @@ function registerDrawingHandlers(io, socket) {
     }
     room.undoneMap[event.userId] = [];
     scheduleSave(roomCode, room, io);
+
+    // Request client-side flattening if event count exceeds the threshold
+    if (room.events.length > FLATTEN_THRESHOLD && !room._flatteningInProgress) {
+      room._flatteningInProgress = true;
+      room._flatteningEventsLength = room.events.length;
+      socket.emit("request-snapshot", { roomId: roomCode });
+    }
   }
 
   socket.on("draw", async (data) => {
@@ -109,6 +118,31 @@ function registerDrawingHandlers(io, socket) {
     if (!room.undoneMap || !room.undoneMap[userId] || room.undoneMap[userId].length === 0) return;
     const batch = room.undoneMap[userId].pop();
     room.events.push(...batch);
+    scheduleSave(roomCode, room, io);
+    io.to(roomCode).emit("canvas-sync", { events: room.events });
+  });
+
+  socket.on("submit-snapshot", async (data) => {
+    const { roomId: roomCode, base64 } = data;
+    const room = await ensureRoom(roomCode);
+    if (!room || !room._flatteningInProgress) return;
+
+    const N = room._flatteningEventsLength || room.events.length;
+    room._flatteningInProgress = false;
+    room._flatteningEventsLength = null;
+
+    const snapshotEvent = {
+      id: "snapshot-" + Date.now(),
+      type: "snapshot",
+      userId: "server",
+      data: { image: base64 },
+      timestamp: Date.now(),
+    };
+
+    const subsequentEvents = room.events.slice(N);
+    room.events = [snapshotEvent, ...subsequentEvents];
+    room.undoneMap = {};
+
     scheduleSave(roomCode, room, io);
     io.to(roomCode).emit("canvas-sync", { events: room.events });
   });

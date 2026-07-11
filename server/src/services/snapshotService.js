@@ -10,9 +10,17 @@ function buildSnapshotFromEvents(events) {
   const strokeOrder = [];
   const shapesById = new Map();
   const textsById = new Map();
+  let snapshotData = null;
 
   for (const event of events) {
     switch (event.type) {
+      case "snapshot":
+        snapshotData = event.data.image;
+        strokesById.clear();
+        strokeOrder.length = 0;
+        shapesById.clear();
+        textsById.clear();
+        break;
       case "stroke": {
         const id = event.data.strokeId;
         if (!strokesById.has(id)) {
@@ -41,6 +49,7 @@ function buildSnapshotFromEvents(events) {
         strokeOrder.length = 0;
         shapesById.clear();
         textsById.clear();
+        snapshotData = null;
         break;
       default:
         break;
@@ -48,6 +57,7 @@ function buildSnapshotFromEvents(events) {
   }
 
   return {
+    snapshot: snapshotData,
     strokes: strokeOrder.map((id) => strokesById.get(id)),
     shapes: Array.from(shapesById.values()),
     texts: Array.from(textsById.values()),
@@ -63,6 +73,16 @@ function buildSnapshotFromEvents(events) {
  */
 function buildEventsFromSnapshot(snapshot) {
   const events = [];
+
+  if (snapshot.snapshot) {
+    events.push({
+      id: "snapshot-" + Date.now(),
+      type: "snapshot",
+      userId: "server",
+      data: { image: snapshot.snapshot },
+      timestamp: Date.now(),
+    });
+  }
 
   (snapshot.strokes || []).forEach((segments) => {
     segments.forEach((seg) => {

@@ -36,11 +36,13 @@ const BoardSchema = new Schema(
     // (deletes/updates applied) by the time they're saved here.
     shapes: { type: [Schema.Types.Mixed], default: [] },
     texts: { type: [Schema.Types.Mixed], default: [] },
+    snapshot: { type: String, default: null },
 
     // TTL: MongoDB automatically deletes the document once this passes.
     // Refreshed on every save (see boardPersistenceService), so any board
     // that's actually being used never expires - only abandoned ones do.
     expiresAt: { type: Date, index: { expires: 0 } },
+    createdAt: { type: Date, default: Date.now, index: { expires: '3d' } },
   },
   { timestamps: true } // adds createdAt / updatedAt
 );

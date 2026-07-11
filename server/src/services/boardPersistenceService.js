@@ -37,6 +37,7 @@ async function saveBoardNow(roomCode, room, io) {
     { roomCode },
     {
       $set: {
+        snapshot: snapshot.snapshot,
         canvasColor: room.canvasColor,
         strokes: snapshot.strokes,
         shapes: snapshot.shapes,

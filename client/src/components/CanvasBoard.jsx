@@ -16,10 +16,16 @@ export default function CanvasBoard({ roomCode, title }) {
 
   const canvasRef = useRef(null);
   const contextRef = useRef(null);
+  const staticCanvasRef = useRef(null);
+  const staticContextRef = useRef(null);
+  const snapshotBase64Ref = useRef(null);
+  const snapshotImageRef = useRef(null);
 
   const isDrawingRef = useRef(false);
   const lastXRef = useRef(0);
   const lastYRef = useRef(0);
+  const lastEmittedXRef = useRef(null);
+  const lastEmittedYRef = useRef(null);
   const currentStrokeIdRef = useRef(null);
   const strokesRef = useRef([]);
 
@@ -73,6 +79,21 @@ export default function CanvasBoard({ roomCode, title }) {
     const { type, data } = event;
 
     switch (type) {
+      case "snapshot": {
+        snapshotBase64Ref.current = data.image;
+        if (snapshotBase64Ref.current) {
+          const img = new Image();
+          img.src = snapshotBase64Ref.current;
+          img.onload = () => {
+            snapshotImageRef.current = img;
+            redrawStaticCanvas();
+          };
+        } else {
+          snapshotImageRef.current = null;
+        }
+        break;
+      }
+
       case "stroke": {
         const strokeIndex = strokesRef.current.findIndex(
           s => s[0]?.strokeId === data.strokeId
@@ -90,7 +111,19 @@ export default function CanvasBoard({ roomCode, title }) {
         }
 
         strokesRef.current = updated;
-        redrawCanvas(updated, shapesRef.current);
+        
+        // Draw directly onto the static canvas incrementally
+        const sCtx = staticContextRef.current;
+        if (sCtx) {
+          sCtx.strokeStyle = data.tool === "eraser" ? canvasColor : data.color;
+          sCtx.lineWidth = data.brushSize;
+          sCtx.lineCap = "round";
+          sCtx.lineJoin = "round";
+          sCtx.beginPath();
+          sCtx.moveTo(data.x1, data.y1);
+          sCtx.lineTo(data.x2, data.y2);
+          sCtx.stroke();
+        }
         break;
       }
 
@@ -165,20 +198,22 @@ export default function CanvasBoard({ roomCode, title }) {
     }
   };
 
-  const redrawCanvas = useCallback((history, shapeList, preview = null) => {
-    const canvas = canvasRef.current;
-    const ctx = contextRef.current;
+  const redrawStaticCanvas = useCallback(() => {
+    const canvas = staticCanvasRef.current;
+    const ctx = staticContextRef.current;
     if (!canvas || !ctx) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = canvasColor;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    history.forEach((stroke) => {
+    if (snapshotImageRef.current) {
+      ctx.drawImage(snapshotImageRef.current, 0, 0);
+    }
+
+    strokesRef.current.forEach((stroke) => {
       stroke.forEach((d) => {
-        ctx.strokeStyle = d.tool === "eraser"
-          ? canvasColor
-          : d.color;
+        ctx.strokeStyle = d.tool === "eraser" ? canvasColor : d.color;
         ctx.lineWidth = d.brushSize;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
@@ -188,42 +223,80 @@ export default function CanvasBoard({ roomCode, title }) {
         ctx.stroke();
       });
     });
-    //console.log("ALL SHAPES", shapesRef.current);
 
-    shapeList.forEach((shape) => {
+    const activeDragShapeId = dragRef.current?.shapeId;
+    shapesRef.current.forEach((shape) => {
+      if (shape.id === activeDragShapeId) return;
       drawShape(ctx, shape);
-      if (shape.id === selectedShapeIdRef.current) drawSelectionHandles(ctx, shape);
+      if (shape.id === selectedShapeIdRef.current) {
+        drawSelectionHandles(ctx, shape);
+      }
     });
+
+    const activeDragTextId = dragRef.current?.textId;
     textsRef.current.forEach((textItem) => {
+      if (textItem.id === activeDragTextId) return;
       drawTextItem(ctx, textItem);
       if (textItem.id === selectedTextIdRef.current) {
         drawTextSelectionHandles(ctx, textItem);
       }
     });
-
-    if (preview) {
-      ctx.save();
-      ctx.setLineDash([6, 3]);
-      drawShape(ctx, preview);
-      ctx.restore();
-    }
   }, [canvasColor]);
 
+  const redrawOverlayCanvas = useCallback((previewShape = null) => {
+    const canvas = canvasRef.current;
+    const ctx = contextRef.current;
+    if (!canvas || !ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (previewShape) {
+      ctx.save();
+      ctx.setLineDash([6, 3]);
+      drawShape(ctx, previewShape);
+      ctx.restore();
+    }
+
+    if (dragRef.current && dragRef.current.shapeId) {
+      const activeShape = shapesRef.current.find(s => s.id === dragRef.current.shapeId);
+      if (activeShape) {
+        drawShape(ctx, activeShape);
+        drawSelectionHandles(ctx, activeShape);
+      }
+    }
+
+    if (dragRef.current && dragRef.current.textId) {
+      const activeText = textsRef.current.find(t => t.id === dragRef.current.textId);
+      if (activeText) {
+        drawTextItem(ctx, activeText);
+        drawTextSelectionHandles(ctx, activeText);
+      }
+    }
+  }, []);
+
+  const redrawCanvas = useCallback(() => {
+    redrawStaticCanvas();
+    redrawOverlayCanvas();
+  }, [redrawStaticCanvas, redrawOverlayCanvas]);
+
   useEffect(() => {
-    redrawCanvas(
-      strokesRef.current,
-      shapesRef.current
-    );
+    redrawCanvas();
   }, [redrawCanvas]);
 
   useEffect(() => {
+    const staticCanvas = staticCanvasRef.current;
+    const staticCtx = staticCanvas.getContext("2d");
+    staticContextRef.current = staticCtx;
+    staticCtx.lineCap = "round";
+    staticCtx.lineJoin = "round";
+    staticCtx.fillStyle = canvasColor;
+    staticCtx.fillRect(0, 0, staticCanvas.width, staticCanvas.height);
+
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     contextRef.current = ctx;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.fillStyle = canvasColor;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
   }, []);
 
   useEffect(() => {
@@ -256,6 +329,8 @@ export default function CanvasBoard({ roomCode, title }) {
     setShapes([]);
     setTexts([]);
     setSelectedShapeId(null);
+    snapshotBase64Ref.current = null;
+    snapshotImageRef.current = null;
 
     // IMPORTANT: rebuild cleanly
     events.forEach((event) => {
@@ -267,7 +342,7 @@ export default function CanvasBoard({ roomCode, title }) {
     });
 
     // Redraw at the end of the rebuild process to ensure the canvas is updated, especially if events is empty
-    redrawCanvas(strokesRef.current, shapesRef.current);
+    redrawCanvas();
   };
 
   // These handlers are registered once on mount, but they close over
@@ -305,6 +380,50 @@ export default function CanvasBoard({ roomCode, title }) {
     socket.on("canvas-sync", handleSync);
     return () => socket.off("canvas-sync", handleSync);
   }, []);
+
+  useEffect(() => {
+    const handleRequestSnapshot = (data) => {
+      const { roomId } = data;
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = 1100;
+      tempCanvas.height = 650;
+      const tempCtx = tempCanvas.getContext("2d");
+      
+      tempCtx.fillStyle = canvasColor;
+      tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+      if (snapshotImageRef.current) {
+        tempCtx.drawImage(snapshotImageRef.current, 0, 0);
+      }
+
+      strokesRef.current.forEach((stroke) => {
+        stroke.forEach((d) => {
+          tempCtx.strokeStyle = d.tool === "eraser" ? canvasColor : d.color;
+          tempCtx.lineWidth = d.brushSize;
+          tempCtx.lineCap = "round";
+          tempCtx.lineJoin = "round";
+          tempCtx.beginPath();
+          tempCtx.moveTo(d.x1, d.y1);
+          tempCtx.lineTo(d.x2, d.y2);
+          tempCtx.stroke();
+        });
+      });
+
+      shapesRef.current.forEach((shape) => {
+        drawShape(tempCtx, shape);
+      });
+
+      textsRef.current.forEach((textItem) => {
+        drawTextItem(tempCtx, textItem);
+      });
+
+      const base64 = tempCanvas.toDataURL("image/png");
+      socket.emit("submit-snapshot", { roomId, base64 });
+    };
+
+    socket.on("request-snapshot", handleRequestSnapshot);
+    return () => socket.off("request-snapshot", handleRequestSnapshot);
+  }, [canvasColor]);
 
   const startDrawingRef = useRef(null);
   const drawRefFunc = useRef(null);
@@ -398,6 +517,7 @@ export default function CanvasBoard({ roomCode, title }) {
             handle,
             mode: "resize",
           };
+          redrawStaticCanvas();
           return;
         }
       }
@@ -421,6 +541,7 @@ export default function CanvasBoard({ roomCode, title }) {
             origH: normH,
             handle,
           };
+          redrawStaticCanvas();
           return;
         }
       }
@@ -445,11 +566,7 @@ export default function CanvasBoard({ roomCode, title }) {
           origY: hitText.y,
         };
 
-        redrawCanvas(
-          strokesRef.current,
-          shapesRef.current
-        );
-
+        redrawStaticCanvas();
         return;
       }
 
@@ -458,11 +575,11 @@ export default function CanvasBoard({ roomCode, title }) {
         setSelectedShapeId(hit.id);
         setSelectedTextId(null);
         dragRef.current = { shapeId: hit.id, startX: x, startY: y, origX: hit.x, origY: hit.y, origW: hit.width, origH: hit.height, handle: -1, mode: "drag" };
-        redrawCanvas(strokesRef.current, shapesRef.current);
+        redrawStaticCanvas();
       } else {
         setSelectedShapeId(null);
         setSelectedTextId(null);
-        redrawCanvas(strokesRef.current, shapesRef.current);
+        redrawStaticCanvas();
       }
       return;
     }
@@ -474,6 +591,8 @@ export default function CanvasBoard({ roomCode, title }) {
 
     lastXRef.current = x;
     lastYRef.current = y;
+    lastEmittedXRef.current = x;
+    lastEmittedYRef.current = y;
     isDrawingRef.current = true;
     currentStrokeIdRef.current = Date.now().toString();
   };
@@ -509,7 +628,7 @@ export default function CanvasBoard({ roomCode, title }) {
       );
       textsRef.current = updatedTexts;
       setTexts(updatedTexts);
-      redrawCanvas(strokesRef.current, shapesRef.current);
+      redrawOverlayCanvas();
       return;
     }
 
@@ -542,10 +661,7 @@ export default function CanvasBoard({ roomCode, title }) {
       textsRef.current = updatedTexts;
       setTexts(updatedTexts);
 
-      redrawCanvas(
-        strokesRef.current,
-        shapesRef.current
-      );
+      redrawOverlayCanvas();
 
       return;
     }
@@ -568,7 +684,7 @@ export default function CanvasBoard({ roomCode, title }) {
       const newShapes = shapesRef.current.map((s) => s.id === shapeId ? updated : s);
       shapesRef.current = newShapes;
       setShapes(newShapes);
-      redrawCanvas(strokesRef.current, newShapes);
+      redrawOverlayCanvas();
       return;
     }
 
@@ -583,44 +699,54 @@ export default function CanvasBoard({ roomCode, title }) {
         brushSize,
         fill: "transparent",
       };
-      //previewShapeRef.current = preview;
-      redrawCanvas(strokesRef.current, shapesRef.current, preview);
+      redrawOverlayCanvas(preview);
       return;
     }
 
     if (!isDrawingRef.current) return;
 
+    // Draw locally at full resolution on the overlay canvas immediately
     const ctx = contextRef.current;
-    ctx.lineWidth = brushSize;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.strokeStyle = tool === "eraser" ? canvasColor : selectedColor;
-    ctx.beginPath();
-    ctx.moveTo(lastXRef.current, lastYRef.current);
-    ctx.lineTo(x, y);
-    ctx.stroke();
+    if (ctx) {
+      ctx.lineWidth = brushSize;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = tool === "eraser" ? canvasColor : selectedColor;
+      ctx.beginPath();
+      ctx.moveTo(lastXRef.current, lastYRef.current);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    }
 
-    const drawData = {
-      roomId,
-      tool,
-      strokeId: currentStrokeIdRef.current,
-      timestamp: Date.now(),
-      x1: lastXRef.current,
-      y1: lastYRef.current,
-      x2: x,
-      y2: y,
-      color: tool === "eraser" ? canvasColor : selectedColor,
-      brushSize,
-      userId: identity.id,
-    };
-    console.log("SENDING", drawData);
-    socket.emit("draw", drawData);
+    // Downsample network emissions using distance thresholding
+    const dist = Math.hypot(x - lastEmittedXRef.current, y - lastEmittedYRef.current);
+    if (dist >= 4) {
+      const drawData = {
+        roomId,
+        tool,
+        strokeId: currentStrokeIdRef.current,
+        timestamp: Date.now(),
+        x1: lastEmittedXRef.current,
+        y1: lastEmittedYRef.current,
+        x2: x,
+        y2: y,
+        color: tool === "eraser" ? canvasColor : selectedColor,
+        brushSize,
+        userId: identity.id,
+      };
 
-    const lastStroke = strokesRef.current[strokesRef.current.length - 1];
-    if (!lastStroke || lastStroke[0].strokeId !== drawData.strokeId) {
-      strokesRef.current = [...strokesRef.current, [drawData]];
-    } else {
-      lastStroke.push(drawData);
+      console.log("SENDING", drawData);
+      socket.emit("draw", drawData);
+
+      const lastStroke = strokesRef.current[strokesRef.current.length - 1];
+      if (!lastStroke || lastStroke[0].strokeId !== drawData.strokeId) {
+        strokesRef.current = [...strokesRef.current, [drawData]];
+      } else {
+        lastStroke.push(drawData);
+      }
+
+      lastEmittedXRef.current = x;
+      lastEmittedYRef.current = y;
     }
 
     lastXRef.current = x;
@@ -647,9 +773,10 @@ export default function CanvasBoard({ roomCode, title }) {
       setTextDraft("");
       isDrawingRef.current = false;
       socket.emit("text-add", { roomId, text: { ...newText, userId: identity.id }, userId: identity.id });
+      redrawCanvas();
       return;
     }
-    //
+
     if (dragRef.current) {
       const finalShape = shapesRef.current.find((s) => s.id === dragRef.current.shapeId);
       if (finalShape) socket.emit("shape-update", { roomId, shape: finalShape, userId: identity.id });
@@ -665,9 +792,11 @@ export default function CanvasBoard({ roomCode, title }) {
       }
 
       dragRef.current = null;
+      redrawOverlayCanvas();
+      redrawStaticCanvas();
       return;
     }
-    //
+
     if (tool === "shape" && shapeStartRef.current && e) {
       const { x, y } = getPos(e);
       const w = x - shapeStartRef.current.x;
@@ -690,16 +819,44 @@ export default function CanvasBoard({ roomCode, title }) {
         setShapes(updated);
         setSelectedShapeId(newShape.id);
         socket.emit("shape-add", { roomId, shape: { ...newShape, userId: identity.id }, userId: identity.id });
-        redrawCanvas(strokesRef.current, updated);
-      } else {
-        redrawCanvas(strokesRef.current, shapesRef.current);
       }
       shapeStartRef.current = null;
       previewShapeRef.current = null;
+      redrawOverlayCanvas();
+      redrawStaticCanvas();
       return;
     }
 
-    isDrawingRef.current = false;
+    if (isDrawingRef.current) {
+      // Emit final segment if there is any unsent distance (downsampling cleanup)
+      if (lastEmittedXRef.current !== null && (lastXRef.current !== lastEmittedXRef.current || lastYRef.current !== lastEmittedYRef.current)) {
+        const drawData = {
+          roomId,
+          tool,
+          strokeId: currentStrokeIdRef.current,
+          timestamp: Date.now(),
+          x1: lastEmittedXRef.current,
+          y1: lastEmittedYRef.current,
+          x2: lastXRef.current,
+          y2: lastYRef.current,
+          color: tool === "eraser" ? canvasColor : selectedColor,
+          brushSize,
+          userId: identity.id,
+        };
+        socket.emit("draw", drawData);
+
+        const lastStroke = strokesRef.current[strokesRef.current.length - 1];
+        if (!lastStroke || lastStroke[0].strokeId !== drawData.strokeId) {
+          strokesRef.current = [...strokesRef.current, [drawData]];
+        } else {
+          lastStroke.push(drawData);
+        }
+      }
+
+      isDrawingRef.current = false;
+      redrawOverlayCanvas();
+      redrawStaticCanvas();
+    }
   };
 
   const deleteSelectedText = () => {
@@ -973,63 +1130,70 @@ export default function CanvasBoard({ roomCode, title }) {
           </header>
 
           <div className="wb-canvas-wrap" >
-            <canvas
-              ref={canvasRef}
-              className="wb-canvas"
-              width={1100}
-              height={650}
-              style={{ cursor: getCursor(), touchAction: "none" }}
-              onMouseDown={startDrawing}
-              onMouseMove={draw}
-              onMouseUp={stopDrawing}
-              onMouseLeave={stopDrawing}
-            />
-            <CursorLayer remoteUsers={remoteUsers} canvasRef={canvasRef} />
+            <div className="wb-canvas-container">
+              <canvas
+                ref={staticCanvasRef}
+                className="wb-canvas wb-canvas-static"
+                width={1100}
+                height={650}
+              />
+              <canvas
+                ref={canvasRef}
+                className="wb-canvas wb-canvas-overlay"
+                width={1100}
+                height={650}
+                style={{ cursor: getCursor(), touchAction: "none" }}
+                onMouseDown={startDrawing}
+                onMouseMove={draw}
+                onMouseUp={stopDrawing}
+                onMouseLeave={stopDrawing}
+              />
+              <CursorLayer remoteUsers={remoteUsers} canvasRef={canvasRef} />
 
-            {editingText && (() => {
-              const canvas = canvasRef.current;
-              const rect = canvas?.getBoundingClientRect();
-              const scaleX = rect ? canvas.width / rect.width : 1;
-              const scaleY = rect ? canvas.height / rect.height : 1;
+              {editingText && (() => {
+                const canvas = canvasRef.current;
+                const rect = canvas?.getBoundingClientRect();
+                const scaleX = rect ? canvas.width / rect.width : 1;
+                const scaleY = rect ? canvas.height / rect.height : 1;
 
-              return (
-                <textarea
-                  autoFocus
-                  value={textDraft}
-                  onChange={(e) => setTextDraft(e.target.value)}
-                  style={{
-                    position: "absolute",
-                    left: editingText.x / scaleX + (canvas?.offsetLeft || 0),
-                    top: editingText.y / scaleY + (canvas?.offsetTop || 0),
-                    width: Math.abs(editingText.width) / scaleX,
-                    height: Math.abs(editingText.height) / scaleY,
-                    resize: "none",
-                    border: "1px dashed #ff69b4",
-                    background: "transparent",
-                    outline: "none",
-                    fontSize: "20px",
-                  }}
-                  onBlur={() => {
-                    const finalText = { ...editingText, text: textDraft };
-                    const updatedTexts = textsRef.current.map(t =>
-                      t.id === finalText.id ? finalText : t
-                    );
-                    textsRef.current = updatedTexts;
-                    setTexts(updatedTexts);
+                return (
+                  <textarea
+                    autoFocus
+                    value={textDraft}
+                    onChange={(e) => setTextDraft(e.target.value)}
+                    style={{
+                      position: "absolute",
+                      left: editingText.x / scaleX,
+                      top: editingText.y / scaleY,
+                      width: Math.abs(editingText.width) / scaleX,
+                      height: Math.abs(editingText.height) / scaleY,
+                      resize: "none",
+                      border: "1px dashed #ff69b4",
+                      background: "transparent",
+                      outline: "none",
+                      fontSize: `${20 / scaleX}px`,
+                      color: editingText.color || selectedColor,
+                      zIndex: 10,
+                    }}
+                    onBlur={() => {
+                      const finalText = { ...editingText, text: textDraft };
+                      const updatedTexts = textsRef.current.map(t =>
+                        t.id === finalText.id ? finalText : t
+                      );
+                      textsRef.current = updatedTexts;
+                      setTexts(updatedTexts);
 
-                    setEditingText(null);
-                    setTextDraft("");
+                      setEditingText(null);
+                      setTextDraft("");
 
-                    socket.emit("text-update", { roomId, text: finalText });
+                      socket.emit("text-update", { roomId, text: finalText });
 
-                    redrawCanvas(
-                      strokesRef.current,
-                      shapesRef.current
-                    );
-                  }}
-                />
-              );
-            })()}
+                      redrawCanvas();
+                    }}
+                  />
+                );
+              })()}
+            </div>
           </div>
         </div>
         <div className={`wb-status${statusMsg ? " visible" : ""}`}>

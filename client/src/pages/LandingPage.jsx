@@ -45,7 +45,7 @@ export default function LandingPage() {
   return (
     <div className="landing-shell">
       <h1 className="landing-logo">Artello</h1>
-      
+
       {/* Visual Code Tagline Header */}
       <div className="code-header-container">
         <div className="window-header">
@@ -78,7 +78,7 @@ export default function LandingPage() {
         <form onSubmit={handleCreate} className="landing-form">
           <input
             autoFocus
-            placeholder="Board title (e.g. Sprint Planning)"
+            placeholder="Board title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             maxLength={120}
@@ -91,7 +91,7 @@ export default function LandingPage() {
         <form onSubmit={handleJoin} className="landing-form">
           <input
             autoFocus
-            placeholder="Room code (e.g. ABC123)"
+            placeholder="Room code"
             value={joinCode}
             onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
             maxLength={8}
