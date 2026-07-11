@@ -5,8 +5,15 @@ import { PenIcon, EraserIcon, ShapeIcon, SelectIcon, UndoIcon, RedoIcon, TrashIc
 import SidebarBtn from "./SidebarBtn";
 import { socket } from "../services/socket";
 import { drawTextItem, isPointInText, drawTextSelection, drawTextSelectionHandles, getTextResizeHandle } from "../utils/textUtils";
+import { useUserIdentity } from "../hooks/useUserIdentity";
+import { usePresence } from "../hooks/usePresence";
+import CursorLayer from "./CursorLayer";
+import PresenceBar from "./PresenceBar";
+import { exportCanvasAsPNG } from "../utils/exportUtils";
+
 
 export default function CanvasBoard() {
+  
   const canvasRef = useRef(null);
   const contextRef = useRef(null);
 
@@ -38,7 +45,8 @@ export default function CanvasBoard() {
   const [textBox, setTextBox] = useState(null);
   const [selectedTextId, setSelectedTextId] = useState(null);
   const selectedTextIdRef = useRef(null);
-
+const identity = useUserIdentity();
+  const { remoteUsers, presenceList, sendCursor } = usePresence(roomId, identity, tool);
   useEffect(() => {
     selectedTextIdRef.current = selectedTextId;
   }, [selectedTextId]);
@@ -420,6 +428,7 @@ export default function CanvasBoard() {
 
   const draw = (e) => {
     const { x, y } = getPos(e);
+    sendCursor(x, y);
     if (tool === "text" && textBox && isDrawingRef.current) {
       setTextBox(prev => ({
         ...prev,
@@ -866,6 +875,10 @@ export default function CanvasBoard() {
             <button className="wb-top-btn danger" onClick={clearCanvas}>
               <TrashIcon /> Clear
             </button>
+            <PresenceBar presenceList={presenceList} currentUser={identity} />
+<button className="wb-top-btn" onClick={() => exportCanvasAsPNG(canvasRef.current)}>
+  Export PNG
+</button>
           </header>
 
           <div className="wb-canvas-wrap" >
@@ -880,6 +893,7 @@ export default function CanvasBoard() {
               onMouseUp={stopDrawing}
               onMouseLeave={stopDrawing}
             />
+<CursorLayer remoteUsers={remoteUsers} canvasRef={canvasRef} />
 
             {editingText && (() => {
               const canvas = canvasRef.current;

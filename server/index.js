@@ -55,6 +55,33 @@ function popLastAction(room) {
 io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
+    socket.on("presence-join", ({ roomId, user }) => {
+    if (!roomUsers.has(roomId)) roomUsers.set(roomId, new Map());
+    roomUsers.get(roomId).set(socket.id, user);
+    io.to(roomId).emit("presence-list", getRoomUserList(roomId));
+  });
+
+  socket.on("presence-tool", ({ roomId, userId, tool }) => {
+    const users = roomUsers.get(roomId);
+    if (!users) return;
+    const entry = users.get(socket.id);
+    if (entry) entry.tool = tool;
+  });
+
+  socket.on("cursor-move", (data) => {
+    socket.to(data.roomId).emit("cursor-move", data); // broadcast to everyone else in room
+  });
+
+  socket.on("disconnect", () => {
+    for (const [roomId, users] of roomUsers.entries()) {
+      if (users.has(socket.id)) {
+        users.delete(socket.id);
+        io.to(roomId).emit("presence-list", getRoomUserList(roomId));
+        io.to(roomId).emit("presence-left", socket.id); // note: using socket.id here, see note below
+      }
+    }
+  });
+
     socket.on("join-room", (roomId) => {
         socket.join(roomId);
         console.log(`User ${socket.id} joined room ${roomId}`);
@@ -255,6 +282,12 @@ io.on("connection", (socket) => {
         console.log("User disconnected:", socket.id);
     });
 });
+
+const roomUsers = new Map(); // roomId -> Map(socketId -> user)
+
+function getRoomUserList(roomId) {
+  return Array.from(roomUsers.get(roomId)?.values() ?? []);
+}
 
 httpServer.listen(5000, () => {
     console.log("Server running on port 5000");
