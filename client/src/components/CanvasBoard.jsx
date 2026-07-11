@@ -749,9 +749,21 @@ export default function CanvasBoard({ roomCode, title }) {
 
   useEffect(() => {
     if (!roomId) return;
-    socket.emit("join-room", roomId);
+    const handleConnect = () => {
+      socket.emit("join-room", roomId);
+    };
+
+    if (socket.connected) {
+      handleConnect();
+    }
+
+    socket.on("connect", handleConnect);
     showStatus(`Joined "${title}"`);
-  }, [roomId]);
+
+    return () => {
+      socket.off("connect", handleConnect);
+    };
+  }, [roomId, title]);
 
   useEffect(() => {
     const handleSaved = () => showStatus("Saved");

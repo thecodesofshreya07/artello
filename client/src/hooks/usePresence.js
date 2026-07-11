@@ -8,15 +8,24 @@ export function usePresence(roomId, identity, tool) {
   const [presenceList, setPresenceList] = useState([]); // [{ id, name, color }]
   const lastSentRef = useRef(0);
 
-  // Announce presence on join, and whenever tool changes
+  // Announce presence on join, and whenever tool changes, including socket reconnections
   useEffect(() => {
     if (!roomId || !identity) return;
-    socket.emit("presence-join", { roomId, user: identity });
-  }, [roomId, identity]);
 
-  useEffect(() => {
-    if (!roomId || !identity) return;
-    socket.emit("presence-tool", { roomId, userId: identity.id, tool });
+    const handleConnect = () => {
+      socket.emit("presence-join", { roomId, user: identity });
+      socket.emit("presence-tool", { roomId, userId: identity.id, tool });
+    };
+
+    if (socket.connected) {
+      handleConnect();
+    }
+
+    socket.on("connect", handleConnect);
+
+    return () => {
+      socket.off("connect", handleConnect);
+    };
   }, [roomId, identity, tool]);
 
   useEffect(() => {
