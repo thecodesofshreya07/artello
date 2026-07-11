@@ -45,9 +45,25 @@ export default function LandingPage() {
   return (
     <div className="landing-shell">
       <h1 className="landing-logo">Artello</h1>
-      <p className="landing-tagline">
-        A lightweight collaborative whiteboard. No sign-up, just share a link.
-      </p>
+      
+      {/* Visual Code Tagline Header */}
+      <div className="code-header-container">
+        <div className="window-header">
+          <div className="window-controls">
+            <span className="dot red"></span>
+            <span className="dot yellow"></span>
+            <span className="dot green"></span>
+          </div>
+          <span className="window-title">artello.config.js</span>
+        </div>
+        <pre>
+          <code className="code-content">
+            <span className="comment">// No signup. No bloat. O(1) friction.</span>
+            {"\n"}
+            <span className="keyword">const</span> <span class="variable">artello</span> = () =&gt; <span className="string">'click'</span> ➔ <span className="string">'share'</span> ➔ <span className="string">'sketch'</span>;
+          </code>
+        </pre>
+      </div>
 
       <div className="landing-tabs">
         <button className={mode === "create" ? "active" : ""} onClick={() => setMode("create")}>

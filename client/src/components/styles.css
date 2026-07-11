@@ -621,3 +621,62 @@ body {
   font-weight: 500;
   cursor: pointer;
 }
+.code-header-container {
+  background-color: #16161a; /* Darker tone to stand out against your background */
+  border: 1px solid #2a2a30;
+  border-radius: 8px;
+  font-family: 'Fira Code', Consolas, Monaco, monospace;
+  padding: 14px 18px;
+  max-width: 520px;
+  margin: 20px auto 30px auto; /* Centers it perfectly above your action buttons */
+  text-align: left; /* Keeps code properly left-aligned while container is centered */
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.window-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #242428;
+}
+
+.window-controls {
+  display: flex;
+  gap: 6px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.red { background-color: #ff5f56; }
+.yellow { background-color: #ffbd2e; }
+.green { background-color: #27c93f; }
+
+.window-title {
+  color: #65656a;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+pre {
+  margin: 0;
+  overflow-x: auto;
+}
+
+.code-content {
+  color: #e1e1e6;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Syntax Highlighting to match dark mode aesthetics */
+.comment { color: #6272a4; font-style: italic; }
+.keyword { color: #ff79c6; } /* Matches your hot pink theme accents! */
+.variable { color: #50fa7b; }
+.string { color: #f1fa8c; }
