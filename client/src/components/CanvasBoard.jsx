@@ -333,11 +333,30 @@ export default function CanvasBoard({ roomCode, title }) {
     setShapes([]);
     setTexts([]);
     setSelectedShapeId(null);
-    snapshotBase64Ref.current = null;
-    snapshotImageRef.current = null;
+    setSelectedTextId(null);
+
+    // Only reload or clear the snapshot if it has changed
+    const firstEvent = events[0];
+    if (firstEvent && firstEvent.type === "snapshot") {
+      const newImageBase64 = firstEvent.data.image;
+      if (snapshotBase64Ref.current !== newImageBase64) {
+        snapshotBase64Ref.current = newImageBase64;
+        snapshotImageRef.current = null;
+        const img = new Image();
+        img.src = newImageBase64;
+        img.onload = () => {
+          snapshotImageRef.current = img;
+          redrawStaticCanvas();
+        };
+      }
+    } else {
+      snapshotBase64Ref.current = null;
+      snapshotImageRef.current = null;
+    }
 
     // IMPORTANT: rebuild cleanly
     events.forEach((event) => {
+      if (event.type === "snapshot") return; // already processed
       try {
         applyEvent(event);
       } catch (err) {
