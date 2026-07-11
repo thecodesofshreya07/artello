@@ -349,3 +349,275 @@ body {
   border-radius: 50%;
   background: #16A34A;
 }
+
+/* ============================================================
+   PERSISTENCE PHASE — append to the end of styles.css
+   Covers: topbar title/code badge, LandingPage, ShareBoardModal,
+   BoardPage loading / not-found states.
+   ============================================================ */
+
+/* ---- Topbar: board title + room code (replaces old join input) ---- */
+
+.wb-board-title {
+  font-weight: 600;
+  color: #18181B;
+}
+
+.wb-room-code {
+  font-family: 'Space Grotesk', sans-serif;
+  letter-spacing: 0.5px;
+  color: #FF007F;
+}
+
+.wb-board-title::after {
+  content: '';
+  display: inline-block;
+  width: 1px;
+  height: 12px;
+  background: #BBF7D0;
+  margin: 0 8px;
+  vertical-align: middle;
+}
+
+/* ---- Landing page ---- */
+
+.landing-shell {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #18181B;
+  background-image: radial-gradient(circle, #27272A 1px, transparent 1px);
+  background-size: 24px 24px;
+  padding: 24px;
+  text-align: center;
+}
+
+.landing-logo {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 40px;
+  color: #FF007F;
+  letter-spacing: -1px;
+  margin-bottom: 4px;
+}
+
+.landing-tagline {
+  color: #A1A1AA;
+  font-size: 14px;
+  max-width: 360px;
+  margin-bottom: 28px;
+}
+
+.landing-tabs {
+  display: flex;
+  background: #27272A;
+  border-radius: 10px;
+  padding: 4px;
+  gap: 4px;
+  margin-bottom: 20px;
+}
+
+.landing-tabs button {
+  border: none;
+  background: transparent;
+  color: #A1A1AA;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.landing-tabs button:hover {
+  color: #FFFFFF;
+}
+
+.landing-tabs button.active {
+  background: #FF007F;
+  color: #FFFFFF;
+}
+
+.landing-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 320px;
+}
+
+.landing-form input {
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid #3F3F46;
+  border-radius: 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  background: #27272A;
+  color: #FFFFFF;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.landing-form input:focus {
+  border-color: #FF007F;
+}
+
+.landing-form input::placeholder {
+  color: #71717A;
+}
+
+.landing-form button {
+  height: 44px;
+  border: none;
+  border-radius: 10px;
+  background: #FF007F;
+  color: #FFFFFF;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.landing-form button:hover {
+  opacity: 0.88;
+}
+
+.landing-form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.landing-error {
+  color: #FF6B81;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+/* ---- Share board modal ---- */
+
+.share-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.share-modal {
+  background: #FFFFFF;
+  border-radius: 14px;
+  padding: 28px;
+  width: 380px;
+  max-width: 90vw;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  text-align: center;
+}
+
+.share-modal h2 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 18px;
+  color: #18181B;
+  margin-bottom: 8px;
+}
+
+.share-modal p {
+  font-size: 13px;
+  color: #71717A;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.share-code {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 28px;
+  letter-spacing: 4px;
+  color: #FF007F;
+  background: #FDF2F8;
+  border: 1px dashed #FBCFE8;
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.share-link-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.share-link-row input {
+  flex: 1;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid #E4E4E7;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #71717A;
+  background: #F7F7F5;
+  outline: none;
+}
+
+.share-link-row button {
+  height: 38px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 8px;
+  background: #18181B;
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.share-modal-close {
+  width: 100%;
+  height: 42px;
+  border: none;
+  border-radius: 10px;
+  background: #FF007F;
+  color: #FFFFFF;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.share-modal-close:hover {
+  opacity: 0.88;
+}
+
+/* ---- Board loading / not found ---- */
+
+.board-loading,
+.board-not-found {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: #18181B;
+  color: #A1A1AA;
+  font-size: 14px;
+}
+
+.board-not-found button {
+  height: 38px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 8px;
+  background: #FF007F;
+  color: #FFFFFF;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}

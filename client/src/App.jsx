@@ -1,12 +1,14 @@
-import React from 'react'
-import CanvasBoard from './components/CanvasBoard'
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import LandingPage from "./pages/LandingPage";
+import BoardPage from "./pages/BoardPage";
 
-function App() {
+export default function App() {
   return (
-    <div>
-      <CanvasBoard/>
-    </div>
-  )
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/room/:roomCode" element={<BoardPage />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
-
-export default App
