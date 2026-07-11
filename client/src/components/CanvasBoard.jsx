@@ -12,7 +12,7 @@ import PresenceBar from "./PresenceBar";
 import { exportCanvasAsPNG } from "../utils/exportUtils";
 
 
-export default function CanvasBoard() {
+export default function CanvasBoard({ roomCode, title }) {
   
   const canvasRef = useRef(null);
   const contextRef = useRef(null);
@@ -33,8 +33,7 @@ export default function CanvasBoard() {
   const [selectedShapeId, setSelectedShapeId] = useState(null);
   const [brushSize, setBrushSize] = useState(4);
   const [selectedColor, setSelectedColor] = useState("#18181B");
-  const [roomId, setRoomId] = useState("");
-  const [joined, setJoined] = useState(false);
+  const roomId = roomCode; 
   const [tool, setTool] = useState("pen");
   const [canvasColor, setCanvasColor] = useState("#ffffff");
   const [selectedShape, setSelectedShape] = useState("rectangle");
@@ -691,12 +690,17 @@ const identity = useUserIdentity();
     showStatus("Canvas cleared");
   };
 
-  const joinRoom = () => {
-    if (!roomId.trim()) return;
+  useEffect(() => {
+    if (!roomId) return;
     socket.emit("join-room", roomId);
-    setJoined(true);
-    showStatus(`Joined room "${roomId}"`);
-  };
+    showStatus(`Joined "${title}"`);
+  }, [roomId]);
+
+  useEffect(() => {
+    const handleSaved = () => showStatus("Saved");
+    socket.on("board-saved", handleSaved);
+    return () => socket.off("board-saved", handleSaved);
+  }, []);
 
   const deleteSelectedShape = () => {
     if (!selectedShapeIdRef.current) return;
@@ -775,24 +779,11 @@ const identity = useUserIdentity();
 
         <div className="wb-main">
           <header className="wb-topbar">
-            {joined ? (
-              <div className="wb-joined-badge">
-                <div className="wb-joined-dot" />
-                {roomId}
-              </div>
-            ) : (
-              <>
-                <input
-                  className="wb-room-input"
-                  type="text"
-                  placeholder="Room ID"
-                  value={roomId}
-                  onChange={(e) => setRoomId(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && joinRoom()}
-                />
-                <button className="wb-join-btn" onClick={joinRoom}>Join</button>
-              </>
-            )}
+            <div className="wb-joined-badge">
+              <div className="wb-joined-dot" />
+              <span className="wb-board-title">{title}</span>
+              <span className="wb-room-code">{roomId}</span>
+            </div>
 
             {tool === "shape" && (
               <>
