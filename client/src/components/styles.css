@@ -664,10 +664,7 @@ body {
   letter-spacing: 0.5px;
 }
 
-pre {
-  margin: 0;
-  overflow-x: auto;
-}
+
 
 .code-content {
   color: #e1e1e6;
