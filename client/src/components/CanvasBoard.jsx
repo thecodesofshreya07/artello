@@ -629,12 +629,14 @@ export default function CanvasBoard({ roomCode, title }) {
 
   const stopDrawing = (e) => {
     if (tool === "text" && textBox) {
+      const w = Math.abs(textBox.width) < 10 ? 150 : textBox.width;
+      const h = Math.abs(textBox.height) < 10 ? 40 : textBox.height;
       const newText = {
         id: Date.now().toString(),
         x: textBox.x,
         y: textBox.y,
-        width: textBox.width,
-        height: textBox.height,
+        width: w,
+        height: h,
         text: "",
         color: selectedColor,
       };
