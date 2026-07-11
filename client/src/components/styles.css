@@ -686,25 +686,45 @@ body {
   }
 
   .wb-topbar {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    padding: 0 8px;
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 52px;
+    padding: 8px;
     gap: 6px;
-    scrollbar-width: none;
+    row-gap: 10px;
+    overflow-x: visible;
   }
-  .wb-topbar::-webkit-scrollbar { display: none; }
+
+  .wb-topbar-sep {
+    display: none;
+  }
 
   .wb-size-row .wb-size-label,
   .wb-color-row .wb-color-label {
-    display: none; /* keep the controls, drop the text labels to save space */
+    display: none;
   }
 
-  .wb-board-title { display: none; } /* room code badge alone is enough on small screens */
+  .wb-board-title {
+    display: none;
+  }
 
-  .wb-canvas-wrap { padding: 8px; }
+  .wb-top-btn {
+    padding: 0 10px;
+    font-size: 12px;
+  }
+
+  .wb-canvas-wrap {
+    align-items: flex-start;
+    justify-content: flex-start;
+    overflow: auto;
+    padding: 8px;
+    -webkit-overflow-scrolling: touch;
+  }
 
   .wb-canvas {
-    width: 100%;
-    height: auto;
+    width: auto;
+    height: 82vh;
+    max-width: none;
+    max-height: none;
   }
 }
