@@ -100,8 +100,13 @@ function registerDrawingHandlers(io, socket) {
   socket.on("undo", async (data) => {
     const { roomId: roomCode, userId } = typeof data === "string" ? { roomId: data } : data;
     const room = await ensureRoom(roomCode);
+    console.log(`[undo] user=${userId} room=${roomCode} totalEvents=${room.events.length} userEventCount=${room.events.filter(e => e.userId === userId).length}`);
     const batch = popUserLastAction(room, userId);
-    if (!batch) return;
+    if (!batch) {
+      console.log(`[undo] no matching event found for user=${userId}`);
+      return;
+    }
+    console.log(`[undo] removed batch of ${batch.length} event(s), type=${batch[0]?.type}`);
     if (!room.undoneMap) room.undoneMap = {};
     if (!room.undoneMap[userId]) room.undoneMap[userId] = [];
     room.undoneMap[userId].push(batch);

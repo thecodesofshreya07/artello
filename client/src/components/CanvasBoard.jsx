@@ -111,7 +111,7 @@ export default function CanvasBoard({ roomCode, title }) {
         }
 
         strokesRef.current = updated;
-        
+
         // Draw directly onto the static canvas incrementally
         const sCtx = staticContextRef.current;
         if (sCtx) {
@@ -411,7 +411,7 @@ export default function CanvasBoard({ roomCode, title }) {
       tempCanvas.width = 1100;
       tempCanvas.height = 650;
       const tempCtx = tempCanvas.getContext("2d");
-      
+
       tempCtx.fillStyle = canvasColor;
       tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
 
@@ -1052,9 +1052,9 @@ export default function CanvasBoard({ roomCode, title }) {
               )}
 
               {(selectedShapeId || selectedTextId) && (() => {
-                const selectedItem = selectedShapeId 
+                const selectedItem = selectedShapeId
                   ? shapes.find(s => s.id === selectedShapeId)
-                  : selectedTextId 
+                  : selectedTextId
                     ? texts.find(t => t.id === selectedTextId)
                     : null;
 
@@ -1067,13 +1067,13 @@ export default function CanvasBoard({ roomCode, title }) {
                       <span className="wb-color-label">Recolor</span>
                       <div className="wb-color-swatch">
                         <div className="wb-color-preview" style={{ background: selectedItem.color || "#000000" }} />
-                        <input 
-                          type="color" 
-                          value={selectedItem.color || "#000000"} 
+                        <input
+                          type="color"
+                          value={selectedItem.color || "#000000"}
                           onChange={(e) => {
                             const newColor = e.target.value;
                             if (selectedShapeId) {
-                              const updatedShapes = shapes.map(s => 
+                              const updatedShapes = shapes.map(s =>
                                 s.id === selectedShapeId ? { ...s, color: newColor } : s
                               );
                               setShapes(updatedShapes);
@@ -1082,7 +1082,7 @@ export default function CanvasBoard({ roomCode, title }) {
                               socket.emit("shape-update", { roomId, shape: updatedShape, userId: identity.id });
                               redrawCanvas(strokesRef.current, updatedShapes);
                             } else if (selectedTextId) {
-                              const updatedTexts = texts.map(t => 
+                              const updatedTexts = texts.map(t =>
                                 t.id === selectedTextId ? { ...t, color: newColor } : t
                               );
                               setTexts(updatedTexts);
@@ -1091,7 +1091,7 @@ export default function CanvasBoard({ roomCode, title }) {
                               socket.emit("text-update", { roomId, text: updatedText, userId: identity.id });
                               redrawCanvas(strokesRef.current, shapesRef.current);
                             }
-                          }} 
+                          }}
                         />
                       </div>
                     </div>
@@ -1205,8 +1205,7 @@ export default function CanvasBoard({ roomCode, title }) {
 
                       setEditingText(null);
                       setTextDraft("");
-
-                      socket.emit("text-update", { roomId, text: finalText });
+                      socket.emit("text-update", { roomId, text: finalText, userId: identity.id });
 
                       redrawCanvas();
                     }}
