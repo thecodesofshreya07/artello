@@ -678,53 +678,138 @@ body {
 .variable { color: #50fa7b; }
 .string { color: #f1fa8c; }
 
+/* ============================================================
+   MOBILE UI OPTIMIZATIONS (Max-width: 768px)
+   ============================================================ */
+/* ============================================================
+   MOBILE UI OPTIMIZATIONS (Max-width: 768px)
+   ============================================================ */
 @media (max-width: 768px) {
-  .wb-shell aside {
-    width: 44px !important;
-    min-width: 44px !important;
-    padding: 10px 0 !important;
+  /* 1. Prevent screen bouncing and force layout constraint */
+  body {
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+    height: 100%;
   }
 
+  /* 2. Re-arrange the main outer layout container to stack cleanly */
+  .wb-shell {
+    flex-direction: column-reverse !important; /* Pushes tools to the bottom bar, main content to top */
+    height: 100vh !important;
+    width: 100vw !important;
+    overflow: hidden !important;
+  }
+
+  /* 3. FIX: Restructure the main container wrapper to stretch full height */
+  .wb-main {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    height: calc(100vh - 60px) !important; /* Total height minus the 60px bottom bar */
+    width: 100% !important;
+    overflow: hidden !important;
+  }
+
+  /* 4. FIX VISIBILITY: Force top navigation action ribbon to appear */
   .wb-topbar {
-    flex-wrap: wrap;
-    height: auto;
-    min-height: 52px;
-    padding: 8px;
-    gap: 6px;
-    row-gap: 10px;
-    overflow-x: visible;
-  }
-
-  .wb-topbar-sep {
-    display: none;
-  }
-
-  .wb-size-row .wb-size-label,
-  .wb-color-row .wb-color-label {
-    display: none;
-  }
-
-  .wb-board-title {
-    display: none;
-  }
-
-  .wb-top-btn {
-    padding: 0 10px;
-    font-size: 12px;
-  }
-
-  .wb-canvas-wrap {
-    align-items: flex-start;
-    justify-content: flex-start;
-    overflow: auto;
-    padding: 8px;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important; /* Halts vertical row breaks */
+    justify-content: flex-start !important;
+    align-items: center !important;
+    height: 56px !important;
+    min-height: 56px !important;
+    width: 100% !important;
+    padding: 0 12px !important;
+    gap: 12px !important;
+    overflow-x: auto !important; /* Allows horizontal swipes on compact viewports */
+    border-bottom: 1px solid #E4E4E7 !important;
+    background: #FFFFFF !important;
+    z-index: 20 !important;
     -webkit-overflow-scrolling: touch;
   }
 
+  /* Hide messy desktop annotations to rescue horizontal real estate */
+  .wb-size-row .wb-size-label,
+  .wb-color-row .wb-color-label,
+  .wb-board-title,
+  .wb-topbar-sep,
+  .wb-logo,
+  .wb-tooltip,
+  .wb-divider {
+    display: none !important;
+  }
+
+  .wb-slider {
+    width: 60px !important;
+  }
+
+  .wb-color-row {
+    margin-left: auto !important; /* Snaps color choices cleanly to the right edge */
+  }
+
+  /* 5. Clean Canvas Viewport Calculation */
+  .wb-canvas-wrap {
+    flex: 1 !important;
+    height: calc(100% - 56px) !important; /* Fills remaining height below topbar */
+    width: 100% !important;
+    padding: 8px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
   .wb-canvas {
-    width: auto;
-    height: 82vh;
-    max-width: none;
-    max-height: none;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    object-fit: contain !important;
+  }
+
+  /* 6. Sidebar Conversion to Navigation Tab bar */
+  .wb-sidebar {
+    width: 100% !important;
+    min-width: 100% !important;
+    height: 60px !important;
+    min-height: 60px !important;
+    flex-direction: row !important;
+    justify-content: space-around !important;
+    align-items: center !important;
+    padding: 0 16px !important;
+    gap: 0 !important;
+    background: #FF007F !important;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1) !important;
+    z-index: 30 !important;
+  }
+
+  .wb-tool-btn {
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: 50% !important;
+  }
+
+  .wb-tool-btn.active::before {
+    left: 50% !important;
+    top: auto !important;
+    bottom: 2px !important;
+    transform: translateX(-50%) !important;
+    width: 16px !important;
+    height: 3px !important;
+    border-radius: 3px 3px 0 0 !important;
+  }
+
+  /* 7. Landing Page Fixes */
+  .landing-shell {
+    padding: 16px !important;
+  }
+
+  .code-header-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 12px 0 20px 0 !important;
+  }
+
+  .share-modal {
+    width: 92% !important;
   }
 }
