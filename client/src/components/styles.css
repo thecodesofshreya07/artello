@@ -695,22 +695,23 @@ body {
     height: 100%;
   }
 
-  /* 2. Keep the main outer layout horizontal (sidebar on the left) */
+  /* 2. outer container shell ordered vertically: topbar -> canvas -> bottom bar */
   .wb-shell {
-    flex-direction: row !important;
+    flex-direction: column !important;
     height: 100vh !important;
     width: 100vw !important;
     overflow: hidden !important;
   }
 
-  /* 3. Restructure the main container wrapper */
+  /* 3. Restructure the main container wrapper (topbar & canvas) */
   .wb-main {
     flex: 1 !important;
     display: flex !important;
     flex-direction: column !important;
-    height: 100vh !important;
-    width: calc(100% - 44px) !important;
+    height: calc(100vh - 60px) !important;
+    width: 100% !important;
     overflow: hidden !important;
+    order: 1 !important; /* Top */
   }
 
   /* 4. Top toolbar: wrap onto multiple rows cleanly */
@@ -721,10 +722,10 @@ body {
     justify-content: flex-start !important;
     align-items: center !important;
     height: auto !important;
-    min-height: 56px !important;
+    min-height: 52px !important;
     width: 100% !important;
     padding: 8px 12px !important;
-    gap: 8px 12px !important;
+    gap: 8px 10px !important;
     overflow-x: visible !important;
     border-bottom: 1px solid #E4E4E7 !important;
     background: #FFFFFF !important;
@@ -755,48 +756,67 @@ body {
     gap: 6px !important;
   }
 
-  /* 5. Clean Canvas Viewport Calculation with Horizontal Scroll */
+  /* 5. Centered scaled canvas fitting perfectly on screen width without horizontal scroll */
   .wb-canvas-wrap {
     flex: 1 !important;
     height: 100% !important;
     width: 100% !important;
-    padding: 8px !important;
+    padding: 0 !important; /* Edge-to-edge width to maximize vertical height on phone */
     display: flex !important;
     align-items: center !important;
-    justify-content: flex-start !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
-    -webkit-overflow-scrolling: touch;
+    justify-content: center !important;
+    overflow: hidden !important;
+    background: #F4F4F5 !important;
+    position: relative !important;
   }
 
   .wb-canvas {
-    height: 100% !important;
-    width: auto !important;
-    max-width: none !important;
+    width: 100% !important;
+    height: auto !important;
+    max-width: 100% !important;
     max-height: 100% !important;
     display: block !important;
-    flex-shrink: 0 !important;
+    object-fit: contain !important;
+    flex-shrink: 1 !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08) !important;
+    background: #ffffff !important;
+    border-radius: 0 !important; /* Flat edges fit nicely at full width */
+    touch-action: none;
   }
 
-  /* 6. Sidebar remains on the left but shrinks to 44px */
+  /* 6. Sidebar moves to bottom as a toolbar */
   .wb-sidebar {
-    width: 44px !important;
-    min-width: 44px !important;
-    height: 100vh !important;
-    flex-direction: column !important;
-    justify-content: flex-start !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    height: 60px !important;
+    min-height: 60px !important;
+    flex-direction: row !important;
+    justify-content: space-around !important;
     align-items: center !important;
-    padding: 12px 0 !important;
-    gap: 8px !important;
+    padding: 0 16px !important;
+    gap: 16px !important;
     background: #18181B !important;
-    box-shadow: none !important;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.15) !important;
     z-index: 10 !important;
+    order: 2 !important; /* Bottom */
+    overflow: visible !important;
   }
 
   .wb-tool-btn {
     width: 44px !important;
     height: 44px !important;
     border-radius: 8px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .wb-tool-btn.active::before {
+    left: 50% !important;
+    bottom: 0 !important;
+    top: auto !important;
+    transform: translateX(-50%) !important;
+    width: 20px !important;
+    height: 3px !important;
+    border-radius: 4px 4px 0 0 !important;
   }
 
   /* 7. Landing Page Fixes */
