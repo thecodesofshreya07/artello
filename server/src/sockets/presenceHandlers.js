@@ -22,14 +22,15 @@ function registerPresenceHandlers(io, socket) {
   });
 
   socket.on("disconnect", () => {
-    for (const [roomCode, users] of roomUsers.entries()) {
-      if (users.has(socket.id)) {
-        users.delete(socket.id);
-        io.to(roomCode).emit("presence-list", getRoomUserList(roomCode));
-        io.to(roomCode).emit("presence-left", socket.id);
-      }
+  for (const [roomCode, users] of roomUsers.entries()) {
+    if (users.has(socket.id)) {
+      const leavingUser = users.get(socket.id);
+      users.delete(socket.id);
+      io.to(roomCode).emit("presence-list", getRoomUserList(roomCode));
+      io.to(roomCode).emit("presence-left", leavingUser?.id ?? socket.id);
     }
-  });
+  }
+});
 }
 
 module.exports = { registerPresenceHandlers };

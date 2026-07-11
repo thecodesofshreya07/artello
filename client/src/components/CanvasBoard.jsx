@@ -13,7 +13,7 @@ import { exportCanvasAsPNG } from "../utils/exportUtils";
 
 
 export default function CanvasBoard({ roomCode, title }) {
-  
+
   const canvasRef = useRef(null);
   const contextRef = useRef(null);
 
@@ -33,7 +33,7 @@ export default function CanvasBoard({ roomCode, title }) {
   const [selectedShapeId, setSelectedShapeId] = useState(null);
   const [brushSize, setBrushSize] = useState(4);
   const [selectedColor, setSelectedColor] = useState("#18181B");
-  const roomId = roomCode; 
+  const roomId = roomCode;
   const [tool, setTool] = useState("pen");
   const [canvasColor, setCanvasColor] = useState("#ffffff");
   const [selectedShape, setSelectedShape] = useState("rectangle");
@@ -44,7 +44,7 @@ export default function CanvasBoard({ roomCode, title }) {
   const [textBox, setTextBox] = useState(null);
   const [selectedTextId, setSelectedTextId] = useState(null);
   const selectedTextIdRef = useRef(null);
-const identity = useUserIdentity();
+  const identity = useUserIdentity();
   const { remoteUsers, presenceList, sendCursor } = usePresence(roomId, identity, tool);
   useEffect(() => {
     selectedTextIdRef.current = selectedTextId;
@@ -302,6 +302,35 @@ const identity = useUserIdentity();
     socket.on("canvas-sync", handleSync);
     return () => socket.off("canvas-sync", handleSync);
   }, []);
+
+  const getTouchPos = (touch) => {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      x: (touch.clientX - rect.left) * scaleX,
+      y: (touch.clientY - rect.top) * scaleY,
+    };
+  };
+
+  const handleTouchStart = (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    startDrawing({ clientX: touch.clientX, clientY: touch.clientY });
+  };
+
+  const handleTouchMove = (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    draw({ clientX: touch.clientX, clientY: touch.clientY });
+  };
+
+  const handleTouchEnd = (e) => {
+    e.preventDefault();
+    const touch = e.changedTouches[0];
+    stopDrawing(touch ? { clientX: touch.clientX, clientY: touch.clientY } : null);
+  };
 
   const getPos = (e) => {
     const canvas = canvasRef.current;
@@ -867,9 +896,9 @@ const identity = useUserIdentity();
               <TrashIcon /> Clear
             </button>
             <PresenceBar presenceList={presenceList} currentUser={identity} />
-<button className="wb-top-btn" onClick={() => exportCanvasAsPNG(canvasRef.current)}>
-  Export PNG
-</button>
+            <button className="wb-top-btn" onClick={() => exportCanvasAsPNG(canvasRef.current)}>
+              Export PNG
+            </button>
           </header>
 
           <div className="wb-canvas-wrap" >
@@ -878,13 +907,16 @@ const identity = useUserIdentity();
               className="wb-canvas"
               width={1100}
               height={650}
-              style={{ cursor: getCursor() }}
+              style={{ cursor: getCursor(), touchAction: "none" }}
               onMouseDown={startDrawing}
               onMouseMove={draw}
               onMouseUp={stopDrawing}
               onMouseLeave={stopDrawing}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
             />
-<CursorLayer remoteUsers={remoteUsers} canvasRef={canvasRef} />
+            <CursorLayer remoteUsers={remoteUsers} canvasRef={canvasRef} />
 
             {editingText && (() => {
               const canvas = canvasRef.current;
