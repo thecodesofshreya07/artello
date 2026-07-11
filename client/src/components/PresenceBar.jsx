@@ -22,6 +22,7 @@ export default function PresenceBar({ presenceList, currentUser }) {
             justifyContent: "center",
             border: u.isYou ? "2px solid #FF007F" : "2px solid white",
             boxShadow: "0 0 0 1px rgba(0,0,0,0.1)",
+            flexShrink: 0,
           }}
         >
           {u.name.slice(0, 1)}

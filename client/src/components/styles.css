@@ -862,6 +862,13 @@ canvas.wb-canvas-overlay {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08) !important;
   }
 
+  .wb-board-title {
+    max-width: 100px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
   /* 6. Sidebar moves to bottom as a toolbar */
   .wb-sidebar {
     width: 100% !important;

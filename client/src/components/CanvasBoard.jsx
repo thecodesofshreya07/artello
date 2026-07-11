@@ -192,7 +192,11 @@ export default function CanvasBoard({ roomCode, title }) {
         textsRef.current = [];
         setShapes([]);
         setTexts([]);
-        redrawCanvas([], []);
+        setSelectedShapeId(null);
+        setSelectedTextId(null);
+        snapshotBase64Ref.current = null;
+        snapshotImageRef.current = null;
+        redrawCanvas();
         break;
       }
     }
@@ -885,20 +889,17 @@ export default function CanvasBoard({ roomCode, title }) {
   };
 
   const clearCanvas = () => {
-    if (!canvasRef.current || !contextRef.current) return;
-
     strokesRef.current = [];
     shapesRef.current = [];
     textsRef.current = [];
     setShapes([]);
     setTexts([]);
     setSelectedShapeId(null);
+    setSelectedTextId(null);
+    snapshotBase64Ref.current = null;
+    snapshotImageRef.current = null;
 
-    const ctx = contextRef.current;
-    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-
-    ctx.fillStyle = canvasColor;
-    ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    redrawCanvas();
 
     socket.emit("clear", { roomId, userId: identity.id });
     showStatus("Canvas cleared");
