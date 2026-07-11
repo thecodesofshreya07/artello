@@ -827,145 +827,149 @@ export default function CanvasBoard({ roomCode, title }) {
 
         <div className="wb-main">
           <header className="wb-topbar">
-            <div className="wb-joined-badge">
-              <div className="wb-joined-dot" />
-              <span className="wb-board-title">{title}</span>
-              <span className="wb-room-code">{roomId}</span>
+            <div className="wb-topbar-left">
+              <div className="wb-joined-badge">
+                <div className="wb-joined-dot" />
+                <span className="wb-board-title">{title}</span>
+                <span className="wb-room-code">{roomId}</span>
+              </div>
+              <PresenceBar presenceList={presenceList} currentUser={identity} />
             </div>
 
-            {tool === "shape" && (
-              <>
-                <div className="wb-topbar-sep" />
-                <select
-                  className="wb-shape-select"
-                  value={selectedShape}
-                  onChange={(e) => setSelectedShape(e.target.value)}
-                >
-                  <option value="line">Line</option>
-                  <option value="rectangle">Rectangle</option>
-                  <option value="circle">Ellipse</option>
-                  <option value="triangle">Triangle</option>
-                  <option value="arrow">Arrow</option>
-                  <option value="diamond">Diamond</option>
-                  <option value="hexagon">Hexagon</option>
-                  <option value="star">Star</option>
-                </select>
-              </>
-            )}
-
-            {selectedShapeId && (
-              <>
-                <div className="wb-topbar-sep" />
-                <button className="wb-top-btn danger" onClick={deleteSelectedShape}>
-                  <TrashIcon /> Delete shape
-                </button>
-              </>
-            )}
-            {selectedTextId && (
-              <>
-                <div className="wb-topbar-sep" />
-                <button className="wb-top-btn danger" onClick={deleteSelectedText}>
-                  <TrashIcon /> Delete text
-                </button>
-              </>
-            )}
-
-            {(selectedShapeId || selectedTextId) && (() => {
-              const selectedItem = selectedShapeId 
-                ? shapes.find(s => s.id === selectedShapeId)
-                : selectedTextId 
-                  ? texts.find(t => t.id === selectedTextId)
-                  : null;
-
-              if (!selectedItem) return null;
-
-              return (
+            <div className="wb-topbar-right">
+              {tool === "shape" && (
                 <>
                   <div className="wb-topbar-sep" />
-                  <div className="wb-color-row">
-                    <span className="wb-color-label">Recolor</span>
-                    <div className="wb-color-swatch">
-                      <div className="wb-color-preview" style={{ background: selectedItem.color || "#000000" }} />
-                      <input 
-                        type="color" 
-                        value={selectedItem.color || "#000000"} 
-                        onChange={(e) => {
-                          const newColor = e.target.value;
-                          if (selectedShapeId) {
-                            const updatedShapes = shapes.map(s => 
-                              s.id === selectedShapeId ? { ...s, color: newColor } : s
-                            );
-                            setShapes(updatedShapes);
-                            shapesRef.current = updatedShapes;
-                            const updatedShape = updatedShapes.find(s => s.id === selectedShapeId);
-                            socket.emit("shape-update", { roomId, shape: updatedShape, userId: identity.id });
-                            redrawCanvas(strokesRef.current, updatedShapes);
-                          } else if (selectedTextId) {
-                            const updatedTexts = texts.map(t => 
-                              t.id === selectedTextId ? { ...t, color: newColor } : t
-                            );
-                            setTexts(updatedTexts);
-                            textsRef.current = updatedTexts;
-                            const updatedText = updatedTexts.find(t => t.id === selectedTextId);
-                            socket.emit("text-update", { roomId, text: updatedText, userId: identity.id });
-                            redrawCanvas(strokesRef.current, shapesRef.current);
-                          }
-                        }} 
-                      />
-                    </div>
-                  </div>
+                  <select
+                    className="wb-shape-select"
+                    value={selectedShape}
+                    onChange={(e) => setSelectedShape(e.target.value)}
+                  >
+                    <option value="line">Line</option>
+                    <option value="rectangle">Rectangle</option>
+                    <option value="circle">Ellipse</option>
+                    <option value="triangle">Triangle</option>
+                    <option value="arrow">Arrow</option>
+                    <option value="diamond">Diamond</option>
+                    <option value="hexagon">Hexagon</option>
+                    <option value="star">Star</option>
+                  </select>
                 </>
-              );
-            })()}
+              )}
 
-            <div className="wb-topbar-sep" style={{ marginLeft: "auto" }} />
+              {selectedShapeId && (
+                <>
+                  <div className="wb-topbar-sep" />
+                  <button className="wb-top-btn danger" onClick={deleteSelectedShape}>
+                    <TrashIcon /> Delete shape
+                  </button>
+                </>
+              )}
+              {selectedTextId && (
+                <>
+                  <div className="wb-topbar-sep" />
+                  <button className="wb-top-btn danger" onClick={deleteSelectedText}>
+                    <TrashIcon /> Delete text
+                  </button>
+                </>
+              )}
 
-            <div className="wb-size-row">
-              <span className="wb-size-label">Size {brushSize}</span>
-              <input
-                className="wb-slider"
-                type="range"
-                min="1"
-                max="20"
-                value={brushSize}
-                onChange={(e) => setBrushSize(Number(e.target.value))}
-              />
-            </div>
+              {(selectedShapeId || selectedTextId) && (() => {
+                const selectedItem = selectedShapeId 
+                  ? shapes.find(s => s.id === selectedShapeId)
+                  : selectedTextId 
+                    ? texts.find(t => t.id === selectedTextId)
+                    : null;
 
-            <div className="wb-topbar-sep" />
+                if (!selectedItem) return null;
 
-            <div className="wb-color-row">
-              <span className="wb-color-label">Stroke</span>
-              <div className="wb-color-swatch">
-                <div className="wb-color-preview" style={{ background: selectedColor }} />
-                <input type="color" value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} />
+                return (
+                  <>
+                    <div className="wb-topbar-sep" />
+                    <div className="wb-color-row">
+                      <span className="wb-color-label">Recolor</span>
+                      <div className="wb-color-swatch">
+                        <div className="wb-color-preview" style={{ background: selectedItem.color || "#000000" }} />
+                        <input 
+                          type="color" 
+                          value={selectedItem.color || "#000000"} 
+                          onChange={(e) => {
+                            const newColor = e.target.value;
+                            if (selectedShapeId) {
+                              const updatedShapes = shapes.map(s => 
+                                s.id === selectedShapeId ? { ...s, color: newColor } : s
+                              );
+                              setShapes(updatedShapes);
+                              shapesRef.current = updatedShapes;
+                              const updatedShape = updatedShapes.find(s => s.id === selectedShapeId);
+                              socket.emit("shape-update", { roomId, shape: updatedShape, userId: identity.id });
+                              redrawCanvas(strokesRef.current, updatedShapes);
+                            } else if (selectedTextId) {
+                              const updatedTexts = texts.map(t => 
+                                t.id === selectedTextId ? { ...t, color: newColor } : t
+                              );
+                              setTexts(updatedTexts);
+                              textsRef.current = updatedTexts;
+                              const updatedText = updatedTexts.find(t => t.id === selectedTextId);
+                              socket.emit("text-update", { roomId, text: updatedText, userId: identity.id });
+                              redrawCanvas(strokesRef.current, shapesRef.current);
+                            }
+                          }} 
+                        />
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+
+              <div className="wb-topbar-sep" style={{ marginLeft: "auto" }} />
+
+              <div className="wb-size-row">
+                <span className="wb-size-label">Size {brushSize}</span>
+                <input
+                  className="wb-slider"
+                  type="range"
+                  min="1"
+                  max="20"
+                  value={brushSize}
+                  onChange={(e) => setBrushSize(Number(e.target.value))}
+                />
               </div>
-              <span className="wb-color-label">Canvas</span>
-              <div className="wb-color-swatch">
-                <div className="wb-color-preview" style={{ background: canvasColor }} />
-                <input type="color" value={canvasColor} onChange={(e) => {
-                  const color = e.target.value;
-                  setCanvasColor(color);
-                  socket.emit("canvas-color", { roomId, color });
-                }} />
+
+              <div className="wb-topbar-sep" />
+
+              <div className="wb-color-row">
+                <span className="wb-color-label">Stroke</span>
+                <div className="wb-color-swatch">
+                  <div className="wb-color-preview" style={{ background: selectedColor }} />
+                  <input type="color" value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} />
+                </div>
+                <span className="wb-color-label">Canvas</span>
+                <div className="wb-color-swatch">
+                  <div className="wb-color-preview" style={{ background: canvasColor }} />
+                  <input type="color" value={canvasColor} onChange={(e) => {
+                    const color = e.target.value;
+                    setCanvasColor(color);
+                    socket.emit("canvas-color", { roomId, color });
+                  }} />
+                </div>
               </div>
+
+              <div className="wb-topbar-sep" />
+
+              <button className="wb-top-btn" onClick={() => { socket.emit("undo", { roomId, userId: identity.id }); showStatus("Undo"); }}>
+                <UndoIcon /> Undo
+              </button>
+              <button className="wb-top-btn" onClick={() => { socket.emit("redo", { roomId, userId: identity.id }); showStatus("Redo"); }}>
+                <RedoIcon /> Redo
+              </button>
+              <button className="wb-top-btn danger" onClick={clearCanvas}>
+                <TrashIcon /> Clear
+              </button>
+              <button className="wb-top-btn" onClick={() => exportCanvasAsPNG(canvasRef.current)}>
+                Export PNG
+              </button>
             </div>
-
-            <div className="wb-topbar-sep" />
-
-            <button className="wb-top-btn" onClick={() => { socket.emit("undo", { roomId, userId: identity.id }); showStatus("Undo"); }}>
-              <UndoIcon /> Undo
-            </button>
-            <button className="wb-top-btn" onClick={() => { socket.emit("redo", { roomId, userId: identity.id }); showStatus("Redo"); }}>
-              <RedoIcon /> Redo
-            </button>
-            <button className="wb-top-btn danger" onClick={clearCanvas}>
-              <TrashIcon /> Clear
-            </button>
-            <PresenceBar presenceList={presenceList} currentUser={identity} />
-            <button className="wb-top-btn" onClick={() => exportCanvasAsPNG(canvasRef.current)}>
-              Export PNG
-            </button>
           </header>
 
           <div className="wb-canvas-wrap" >
