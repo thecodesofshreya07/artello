@@ -7,7 +7,121 @@ body {
   background: #F7F7F5;
   overflow: hidden;
 }
+.landing-shell {
+  position: relative;
+  min-height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #18181B;
+  background-image: radial-gradient(circle, #38383F 1.5px, transparent 1.5px);
+  background-size: 24px 24px;
+  padding: 28px 24px 60px;
+}
 
+.landing-header {
+  width: 100%;
+  text-align: left;
+  padding-left: 8px;
+  margin-bottom: 8px;
+  position: relative;
+  z-index: 2;
+}
+
+.landing-logo-top {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  color: #FF007F;
+  letter-spacing: -0.5px;
+}
+
+.landing-logo-mark {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.landing-hero {
+  position: relative;
+  z-index: 1;
+  max-width: 520px;
+  width: 100%;
+  margin: 44px auto 0;
+  padding: 0 4px;
+  text-align: center;
+}
+
+.landing-doodles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.landing-doodles-desktop {
+  height: 260px;
+}
+
+.landing-doodles-mobile {
+  display: none;
+  height: 190px;
+}
+.landing-eyebrow {
+  position: relative;
+  z-index: 1;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: #71717A;
+  margin-bottom: 14px;
+}
+
+.landing-headline {
+  position: relative;
+  z-index: 1;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+  font-size: 38px;
+  line-height: 1.2;
+  color: #F4F4F5;
+  letter-spacing: -0.5px;
+  margin: 0 0 7px;
+}
+
+.landing-headline-accent {
+  color: #FF007F;
+}
+
+.landing-tagline {
+  position: relative;
+  z-index: 1;
+  color: #A1A1AA;
+  font-size: 14px;
+  max-width: 400px;
+  line-height: 1.6;
+  margin: 0 auto 26px;
+}
+
+.code-header-container,
+.landing-tabs,
+.landing-form {
+  position: relative;
+  z-index: 1;
+}
+.landing-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 320px;
+  margin: 0 auto;
+}
 .wb-shell {
   display: flex;
   height: 100vh;
@@ -436,7 +550,7 @@ canvas.wb-canvas-overlay {
 
 /* ---- Landing page ---- */
 
-.landing-shell {
+/* .landing-shell {
   height: 100vh;
   width: 100vw;
   display: flex;
@@ -457,14 +571,14 @@ canvas.wb-canvas-overlay {
   color: #FF007F;
   letter-spacing: -1px;
   margin-bottom: 4px;
-}
+} */
 
-.landing-tagline {
+/* .landing-tagline {
   color: #A1A1AA;
   font-size: 14px;
   max-width: 360px;
   margin-bottom: 28px;
-}
+} */
 
 .landing-tabs {
   display: flex;
@@ -472,7 +586,8 @@ canvas.wb-canvas-overlay {
   border-radius: 10px;
   padding: 4px;
   gap: 4px;
-  margin-bottom: 20px;
+  width: fit-content;
+  margin: 0 auto 20px;
 }
 
 .landing-tabs button {
@@ -495,13 +610,6 @@ canvas.wb-canvas-overlay {
 .landing-tabs button.active {
   background: #FF007F;
   color: #FFFFFF;
-}
-
-.landing-form {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 320px;
 }
 
 .landing-form input {
@@ -735,9 +843,6 @@ canvas.wb-canvas-overlay {
 .variable { color: #50fa7b; }
 .string { color: #f1fa8c; }
 
-/* ============================================================
-   MOBILE UI OPTIMIZATIONS (Max-width: 768px)
-   ============================================================ */
 @media (max-width: 768px) {
   /* 1. Prevent screen bouncing and force layout constraint */
   body {
@@ -907,9 +1012,25 @@ canvas.wb-canvas-overlay {
 
   /* 7. Landing Page Fixes */
   .landing-shell {
-    padding: 16px !important;
-  }
+  position: relative;
+  min-height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #18181B;
+  background-image: radial-gradient(circle, #38383F 1.5px, transparent 1.5px);
+  background-size: 24px 24px;
+  padding: 28px 24px 60px;
+}
 
+.landing-header {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  text-align: left;
+  padding-left: 8px;
+}
   .code-header-container {
     width: 100% !important;
     max-width: 100% !important;
@@ -918,5 +1039,26 @@ canvas.wb-canvas-overlay {
 
   .share-modal {
     width: 92% !important;
+  }
+  .landing-doodles-desktop {
+    display: none !important;
+  }
+
+  .landing-doodles-mobile {
+    display: block !important;
+  }
+
+  .landing-header {
+    position: absolute !important;
+    top: 16px !important;
+    left: 16px !important;
+  }
+
+  .landing-shell {
+    justify-content: center !important;
+  }
+
+  .landing-hero {
+    margin-top: 0 !important;
   }
 }
