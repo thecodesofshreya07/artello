@@ -86,7 +86,7 @@ export default function LandingPage() {
       </h1>
 
       <p className="landing-tagline">
-        Every stroke, cursor, and shape moves the instant you draw it — just an open canvas to play a game, plan with your team, or show up as "swift-otter" and "sharp-tiger.
+        Every stroke, cursor, and shape moves the instant you draw it — just an open canvas to play a game, plan with your team, or show up as "swift-otter" and "sharp-tiger".
       </p>
         <div className="code-header-container">
           <div className="window-header">
